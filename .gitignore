@@ -1,0 +1,21 @@
+# 运行时数据（不入库）
+bridge/*.db
+bridge/*.db-wal
+bridge/*.db-shm
+
+# 真实数据种子（不入库；演示数据 seed.demo.json 要入库）
+data/seed.json
+
+# 构建中间产物
+src/out/
+*.pyc
+__pycache__/
+
+# 日志与进程记录
+logs/
+
+# 本地临时文件
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db

@@ -145,7 +145,7 @@ def _log_age(name: str) -> str:
         return "日志 %ds 前更新" % sec
     if sec < 3600:
         return "日志 %d 分钟前更新" % (sec // 60)
-    return "日志 %d 小时前未更新" % (sec // 3600)
+    return "日志 %d 小时前更新" % (sec // 3600)
 
 
 # 组件定义：name -> (命令行生成函数, 工作目录, 命令行特征[ASCII，用于精确停/查])
@@ -305,6 +305,7 @@ def cmd_status() -> int:
     print("中台地址  http://127.0.0.1:%d/index.html" % CENTER_PORT)
     print("解释器    %s" % (CENTER_PY or "未解析（--python 可指定）"))
     print("日志目录  %s" % LOG_DIR)
+    print("注：日志时间只反映由 pmdesk 拉起的实例；别处启动的实例不写这里。")
     return 0 if all_ok else 1
 
 

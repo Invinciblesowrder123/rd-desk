@@ -82,6 +82,21 @@ python local/server.py 8787
 
 **不要双击 `local/index.html`**——`file://` 下页面拿不到 `/api`，会是空的。
 
+### Windows 双击启动失败？先看这一条
+
+`start-all.bat` 会自己在常见位置里找一个**真正能跑**的 Python（`findpy.bat`）。
+如果它报错说找不到可用解释器，多半是这种情况：
+
+- 你的 PATH 里唯一的 `python` 是 Microsoft Store 的占位符
+  `C:\Users\<你>\AppData\Local\Microsoft\WindowsApps\python.exe`——
+  它是个 0 字节的桩，执行直接返回 9009，什么都不输出。
+- 装了 Python 但没勾「Add python.exe to PATH」。
+
+解决办法：从 <https://www.python.org/downloads/> 装 Python 3.9+，
+安装时勾上 **Add python.exe to PATH**，再双击 `start-all.bat` 即可。
+启动后如果还是有问题，运行 `python pmdesk.py doctor`，它会打印
+解释器、端口占用、进程匹配和日志大小的完整诊断。
+
 ---
 
 ## 架构

@@ -1,20 +1,22 @@
 @echo off
 rem ===========================================================================
 rem  PM_desk stopper  --  stops everything with one double-click
-rem    * center : 研发推进中台 (port 8787)
-rem    * bot    : 飞书长连接监听 (feishu-ws --env .env.prod)
-rem    * web    : pmbot 网页聊天 (only if it was started; optional component)
-rem  ASCII only on purpose -- see start-all.bat header.
+rem    * center : R&D mid-platform service (port 8787)
+rem    * bot    : Feishu long-connection listener (feishu-ws --env .env.prod)
+rem    * web    : pmbot local web chat (optional component, only if running)
+rem
+rem  ASCII only + CRLF endings, on purpose -- see start-all.bat header.
+rem  Python discovery lives in findpy.bat.
 rem ===========================================================================
 chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
-set "PYEXE="
-where python >nul 2>nul && set "PYEXE=python"
-if not defined PYEXE where python3 >nul 2>nul && set "PYEXE=python3"
+call "%~dp0findpy.bat"
 if not defined PYEXE (
-  echo [ERROR] python not found in PATH.
+  echo [ERROR] No usable Python interpreter found -- see findpy.bat.
+  echo        Install Python 3 and add it to PATH, then try again.
+  echo.
   pause
   exit /b 1
 )

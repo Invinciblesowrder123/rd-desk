@@ -12,13 +12,17 @@
   python pmdesk.py stop             停全部
   python pmdesk.py stop bot --dry-run   只看看会杀哪些进程，不动手
   python pmdesk.py status           看状态
+  python pmdesk.py doctor           排查：解释器/端口/进程/日志
   python pmdesk.py restart center   重启某个
+  python pmdesk.py start --python <exe>   指定 center 用的解释器
 
 设计要点：
   * 停止不按进程名瞎杀（本机还有别的 python.exe），而是**按命令行特征**精确匹配，
     所以手工启动的实例也能一起收掉。
   * 同时记录自己拉起的 PID，双保险。
   * 日志落到 logs/<组件>.log，出问题直接看这里。
+  * **解释器不靠 PATH**：Windows 的 Store 别名（WindowsApps\\python.exe）是
+    0 字节桩，执行返回 9009，必须实测筛选，见 resolve_python()。
 """
 from __future__ import annotations
 
@@ -43,10 +47,92 @@ PMBOT_ENV = ".env.prod"
 CENTER_PORT = 8787
 WEB_PORT = 8000
 
+# ---------------------------------------------------------------- 解释器解析
+# 坑：这台机器（以及大量 Win10/11 用户）的 PATH 里只有 Microsoft Store 的
+# 应用执行别名 C:\Users\<u>\AppData\Local\Microsoft\WindowsApps\python.exe。
+# 那是个 0 字节的桩程序：直接执行返回 9009、不产生任何输出，
+# 所以「where python 找得到」≠「python 能用」。
+# 一律以实测（-c "import sys"）判定，桩会被直接淘汰。
+STORE_ALIAS_MARK = "microsoft\\windowsapps"
+
+CENTER_PY = ""          # 运行时由 resolve_python() 填，center 组件用它
+
+
+def _usable_python(path) -> bool:
+    """候选解释器是否真的能跑（挡掉 Store 别名桩和残废安装）。"""
+    if not path:
+        return False
+    try:
+        p = Path(path)
+    except (TypeError, ValueError):
+        return False
+    if STORE_ALIAS_MARK in str(p).lower():
+        return False
+    if not p.is_file():
+        return False
+    try:
+        r = subprocess.run([str(p), "-c", "import sys"],
+                           capture_output=True, timeout=25)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return r.returncode == 0
+
+
+def _python_candidates() -> list[str]:
+    """按优先级列出本机上可能存在的 Python 解释器。"""
+    cands: list[str] = []
+    home = Path(os.path.expanduser("~"))
+    wb = home / ".workbuddy" / "binaries" / "python" / "versions"
+    if wb.is_dir():
+        for d in sorted(wb.iterdir(), reverse=True):
+            cands.append(str(d / "python.exe"))
+    localapp = os.environ.get("LOCALAPPDATA", "")
+    if localapp:
+        pdir = Path(localapp) / "Programs" / "Python"
+        if pdir.is_dir():
+            for d in sorted(pdir.iterdir(), reverse=True):
+                if d.name.lower().startswith("python3"):
+                    cands.append(str(d / "python.exe"))
+    for base in ("C:/Python314", "C:/Python313", "C:/Python312", "C:/Python311",
+                 "C:/Python310", "D:/Python314", "D:/Python313", "D:/Python312"):
+        cands.append(base + "/python.exe")
+    cands.append(str(PMBOT_PY))          # pmbot 自带内嵌版，最后兜底
+    return cands
+
+
+def resolve_python(explicit: str | None = None) -> str | None:
+    """挑一个真正可用的 Python：显式指定 > 当前解释器 > 内嵌/常见安装位置。"""
+    order: list[str] = []
+    if explicit:
+        order.append(explicit)
+    order.append(sys.executable)
+    order.extend(_python_candidates())
+    for c in order:
+        if _usable_python(c):
+            # 只做绝对化，**不要** Path.resolve()：那会把 symlink/junction
+            # 展开成安装目录（如 D:\Workbuddy\resources\vendor\python），
+            # 应用升级换路径就失效了。保留调用方给的原始路径。
+            return os.path.abspath(c)
+    return None
+
+
+def port_busy(port: int) -> int:
+    """端口被谁占着（返回 pid，0 = 空闲）。"""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", port))
+        return 0
+    except OSError:
+        return -1
+    finally:
+        s.close()
+
+
 # 组件定义：name -> (命令行生成函数, 工作目录, 命令行特征[ASCII，用于精确停/查])
 COMPONENTS = {
     "center": {
-        "cmd": lambda: [sys.executable, "server.py", str(CENTER_PORT)],
+        "cmd": lambda: [CENTER_PY, "server.py", str(CENTER_PORT)],
         "cwd": LOCAL_DIR,
         "match": ["server.py %d" % CENTER_PORT],
         "label": "研发推进中台",
@@ -196,6 +282,7 @@ def cmd_status() -> int:
             ("PID " + ", ".join(map(str, pids))) if pids else ""))
     print("-" * 58)
     print("中台地址  http://127.0.0.1:%d/index.html" % CENTER_PORT)
+    print("解释器    %s" % (CENTER_PY or "未解析（--python 可指定）"))
     print("日志目录  %s" % LOG_DIR)
     return 0 if all_ok else 1
 
@@ -212,6 +299,10 @@ def cmd_start(targets: list[str]) -> int:
             # pmbot 是可选的辅助系统；没装就只跑中台，不算失败
             print("[bot] 未安装 pmbot（找不到 %s），跳过。中台不受影响。" % PMBOT_PY)
             print("      需要飞书集成时，把 pmbot 放成同级目录或设置 PMBOT_DIR。")
+            continue
+        if name == "center" and not CENTER_PY:
+            print("[center] 找不到可用的 Python 解释器，无法启动服务")
+            rc = 1
             continue
 
         LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -244,7 +335,7 @@ def cmd_start(targets: list[str]) -> int:
         _save_pids(data)
 
         # 就绪探测
-        deadline = time.time() + 20
+        deadline = time.time() + 25
         ready = False
         while time.time() < deadline:
             if meta["url"] and _http_ok(meta["url"]):
@@ -260,6 +351,12 @@ def cmd_start(targets: list[str]) -> int:
             time.sleep(0.6)
         if ready and proc.poll() is None:
             print("[%s] 就绪" % name)
+        elif not ready:
+            hint = ""
+            if name == "center" and port_busy(CENTER_PORT):
+                hint = "（端口 %d 已被别的程序占用）" % CENTER_PORT
+            print("[%s] 启动超时：25 秒内未就绪%s，详见 %s" % (name, hint, log_path))
+            rc = 1
         log.close()
     return rc
 
@@ -284,9 +381,59 @@ def cmd_stop(targets: list[str], dry: bool = False) -> int:
     return rc
 
 
+def cmd_doctor() -> int:
+    """排查为什么起不来：解释器、端口、进程、日志。"""
+    print("环境诊断")
+    print("-" * 58)
+    print("  当前解释器      %s" % sys.executable)
+    print("  当前解释器可用  %s" % ("是" if _usable_python(sys.executable) else "否（Store 别名桩？）"))
+    picked = resolve_python()
+    print("  探测到的可用解释器  %s" % (picked or "无"))
+    print("  center 将使用    %s" % (CENTER_PY or "无"))
+    print("  bot 将使用       %s" % (PMBOT_PY if PMBOT_PY.exists() else "缺失"))
+    print("-" * 58)
+    for port in (CENTER_PORT, WEB_PORT):
+        busy = port_busy(port)
+        print("  端口 %-6d %s" % (port, "被占用" if busy else "空闲"))
+    print("-" * 58)
+    for name, meta in COMPONENTS.items():
+        pids = find(name)
+        print("  %-7s %s" % (name, ("PID " + ", ".join(map(str, pids))) if pids else "未运行"))
+    print("-" * 58)
+    print("  日志目录         %s" % LOG_DIR)
+    for f in sorted(LOG_DIR.glob("*.log")):
+        print("    %-12s %d bytes" % (f.name, f.stat().st_size))
+    print("=" * 58)
+    print("提示：若 PATH 里只有 Microsoft\\WindowsApps\\python.exe，那是 0 字节")
+    print("      的 Store 占位桩，执行返回 9009 且无输出——必须装真正的 Python，")
+    print("      或让 start-all.bat 从本机已有路径里挑一个（它会自动找）。")
+    return 0
+
+
 def main(argv: list[str]) -> int:
-    arg = [a for a in argv if not a.startswith("--")]
-    flags = [a for a in argv if a.startswith("--")]
+    # 参数解析：--python <path> / --python=<path> 要成对吃掉，不能混进组件名
+    explicit_python: str | None = None
+    rest: list[str] = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--python":
+            i += 1
+            if i < len(argv):
+                explicit_python = argv[i]
+        elif a.startswith("--python="):
+            explicit_python = a.split("=", 1)[1]
+        elif a.startswith("--"):
+            pass                      # 其它开关忽略
+        else:
+            rest.append(a)
+        i += 1
+
+    global CENTER_PY
+    CENTER_PY = resolve_python(explicit_python) or ""
+
+    arg = rest
+    dry = "--dry-run" in argv
     action = arg[0] if arg else "status"
     targets = arg[1:] or DEFAULT_TARGETS
 
@@ -295,9 +442,10 @@ def main(argv: list[str]) -> int:
             print("未知组件 %s，可选：%s" % (t, " / ".join(COMPONENTS)))
             return 2
 
-    dry = "--dry-run" in flags
     if action == "status":
         return cmd_status()
+    if action == "doctor":
+        return cmd_doctor()
     if action == "start":
         return cmd_start(targets)
     if action == "stop":

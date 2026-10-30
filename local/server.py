@@ -19,6 +19,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
+import time
 import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -83,6 +85,11 @@ class Handler(SimpleHTTPRequestHandler):
         try:
             body = self._read_json()
             parts = [x for x in p.split("/") if x]      # api db <id> records [<rid> action]
+            if p == "/api/shutdown":
+                # 优雅退出：先回响应，再让 SQLite 正常 checkpoint，最后退进程
+                self._json(200, {"ok": True, "message": "shutting down"})
+                threading.Thread(target=_graceful_exit, daemon=True).start()
+                return
             if len(parts) < 4 or parts[1] != "db":
                 return self._json(404, {"error": "unknown api"})
             db_id = parts[2]
@@ -132,6 +139,27 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
         if "/api/" in (args[0] if args else ""):
             sys.stderr.write("[api] %s\n" % (args[0] if args else ""))
+
+
+def _graceful_exit() -> None:
+    """收到 POST /api/shutdown 后走正常退出流程。
+
+    为什么必须有这条路：强杀（taskkill /F）会直接打掉进程，SQLite 连接来不及
+    关闭，-wal/-shm 残留。下一个进程恢复 WAL 时可能降级成只读模式，
+    写操作就会报 "attempt to write a readonly database"（数据本身没坏）。
+    所以停止服务必须先请它自己收尾，强杀只作为兜底。
+    """
+    time.sleep(0.15)                      # 给响应留出发送时间
+    try:
+        import sqlite3
+        conn = sqlite3.connect(DB_PATH, timeout=10)
+        try:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        finally:
+            conn.close()
+    except Exception:
+        traceback.print_exc()
+    os._exit(0)
 
 
 def main() -> None:

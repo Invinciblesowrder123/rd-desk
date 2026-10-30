@@ -391,6 +391,30 @@ def cmd_start(targets: list[str]) -> int:
     return rc
 
 
+def _graceful_stop_center(timeout: float = 8.0) -> bool:
+    """请 center 自己优雅退出（POST /api/shutdown），成功返回 True。
+
+    必须走这条路而不是 taskkill /F：强杀会跳过 SQLite 的连接关闭，
+    -wal/-shm 残留，下个进程恢复 WAL 时可能降级成只读，
+    写操作报 "attempt to write a readonly database"。
+    """
+    url = "http://127.0.0.1:%d/api/shutdown" % CENTER_PORT
+    try:
+        req = urllib.request.Request(
+            url, data=b"{}", method="POST",
+            headers={"Content-Type": "application/json"})
+        with _OPENER.open(req, timeout=3.0) as r:
+            r.read()
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not find("center"):
+            return True
+        time.sleep(0.3)
+    return not find("center")
+
+
 def cmd_stop(targets: list[str], dry: bool = False) -> int:
     rc = 0
     for name in targets:
@@ -400,6 +424,14 @@ def cmd_stop(targets: list[str], dry: bool = False) -> int:
             print("[%s] 没在运行" % name)
             continue
         print("[%s] %s %d 个进程" % (name, "将结束" if dry else "结束", len(pids)))
+        if name == "center" and not dry:
+            if _graceful_stop_center():
+                print("[center] 已优雅退出（SQLite 正常 checkpoint，未强杀）")
+                data = _load_pids()
+                data.pop(name, None)
+                _save_pids(data)
+                continue
+            print("[center] 优雅退出没生效，改用强制结束（可能留下 WAL 残留）")
         n = _kill(pids, dry=dry)
         if not dry:
             data = _load_pids()

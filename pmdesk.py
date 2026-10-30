@@ -129,6 +129,25 @@ def port_busy(port: int) -> int:
         s.close()
 
 
+def _log_age(name: str) -> str:
+    """组件日志的新鲜度：多久没更新了。
+
+    用来回答「bot 还在动吗」——进程在 ≠ 有响应，日志停更才是真挂了。
+    """
+    p = LOG_DIR / ("%s.log" % name)
+    try:
+        if not p.is_file() or p.stat().st_size == 0:
+            return ""
+    except OSError:
+        return ""
+    sec = max(0, int(time.time() - p.stat().st_mtime))
+    if sec < 60:
+        return "日志 %ds 前更新" % sec
+    if sec < 3600:
+        return "日志 %d 分钟前更新" % (sec // 60)
+    return "日志 %d 小时前未更新" % (sec // 3600)
+
+
 # 组件定义：name -> (命令行生成函数, 工作目录, 命令行特征[ASCII，用于精确停/查])
 COMPONENTS = {
     "center": {
@@ -277,9 +296,11 @@ def cmd_status() -> int:
             state = "运行中" if pids else "未启动"
         if not pids and not meta["optional"]:
             all_ok = False
-        print("  %-7s %-14s %-18s %s" % (
-            name, meta["label"], state,
-            ("PID " + ", ".join(map(str, pids))) if pids else ""))
+        extra = ("PID " + ", ".join(map(str, pids))) if pids else ""
+        age = _log_age(name)
+        if age:
+            extra = (extra + "  |  " if extra else "") + age
+        print("  %-7s %-14s %-18s %s" % (name, meta["label"], state, extra))
     print("-" * 58)
     print("中台地址  http://127.0.0.1:%d/index.html" % CENTER_PORT)
     print("解释器    %s" % (CENTER_PY or "未解析（--python 可指定）"))
@@ -316,11 +337,20 @@ def cmd_start(targets: list[str]) -> int:
             flags = (subprocess.DETACHED_PROCESS
                      | subprocess.CREATE_NEW_PROCESS_GROUP
                      | subprocess.CREATE_NO_WINDOW)
+
+        # 子进程环境：必须显式给两个变量，否则日志行为完全不对
+        #   PYTHONUNBUFFERED=1  stdout 重定向到文件时 Python 默认用块缓冲(4-8K)，
+        #                       日志会一直卡在缓冲区，进程一停就全丢——表现就是
+        #                       "logs\bot.log 里只有一行 start 标记，什么都没有"
+        #   PYTHONIOENCODING=utf-8  跟随系统 locale(cp936) 时中文输出可能炸
+        child_env = os.environ.copy()
+        child_env["PYTHONUNBUFFERED"] = "1"
+        child_env["PYTHONIOENCODING"] = "utf-8"
         try:
             proc = subprocess.Popen(
                 meta["cmd"](), cwd=str(meta["cwd"]),
                 stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-                creationflags=flags, close_fds=True)
+                env=child_env, creationflags=flags, close_fds=True)
         except Exception as exc:
             print("[%s] 启动失败：%s" % (name, exc))
             log.close()
@@ -378,6 +408,10 @@ def cmd_stop(targets: list[str], dry: bool = False) -> int:
             if n and find(name):
                 print("[%s] 警告：仍有残留进程" % name)
                 rc = 1
+        if name == "bot" and not dry and n:
+            # 飞书 bot 停了，挂在它上面的每日定时推送也跟着没了
+            print("[bot] 提示：定时推送（每天 08:30 项目日报）随 bot 一起停了。")
+            print("      要恢复，双击 start-all.bat。")
     return rc
 
 

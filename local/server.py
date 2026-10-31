@@ -2,6 +2,7 @@
 """本地中台服务端（L2）：数据真身在 bridge/desk.db，页面通过 /api 读写。
 
   GET  /api/rev                              全局版本号（页面轮询它感知别人改动）
+                                             附带 index.html 构建戳 build
   GET  /api/db/<id>/records?cursor=&size=    分页取记录
   POST /api/db/<id>/records                  {properties}
   POST /api/db/<id>/records/<rid>/update     {properties}
@@ -46,6 +47,21 @@ def _pick_seed() -> str:
 SEED_PATH = _pick_seed()
 MAX_BODY = 4 * 1024 * 1024
 
+INDEX_HTML = os.path.join(BASE, "index.html")
+
+
+def build_stamp() -> int:
+    """index.html 的构建戳（mtime，秒）。
+
+    页面在 /api/rev 里拿到它，和打开时的值比对：不一样就说明前端换了一版，
+    提醒用户刷新。**不刷新会一直跑旧 JS**——这是反复踩到的坑（旧版"完成
+    节点"并发两个写请求、错误提示关不掉，都出在这里）。
+    """
+    try:
+        return int(os.path.getmtime(INDEX_HTML))
+    except OSError:
+        return 0
+
 
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
@@ -59,7 +75,8 @@ class Handler(SimpleHTTPRequestHandler):
             return super().do_GET()
         try:
             if p == "/api/rev":
-                return self._json(200, {"rev": deskdb.rev(DB_PATH)})
+                return self._json(200, {"rev": deskdb.rev(DB_PATH),
+                                        "build": build_stamp()})
             if p == "/api/export":
                 return self._json(200, deskdb.export_all(DB_PATH))
             parts = [x for x in p.split("/") if x]      # api db <id> records|schema ...
@@ -86,10 +103,13 @@ class Handler(SimpleHTTPRequestHandler):
             body = self._read_json()
             parts = [x for x in p.split("/") if x]      # api db <id> records [<rid> action]
             if p == "/api/shutdown":
-                # 优雅退出：先回响应，再让 SQLite 正常 checkpoint，最后退进程
+                # 优雅退出：先回响应，再收 SQLite 常驻连接，最后退进程
                 self._json(200, {"ok": True, "message": "shutting down"})
                 threading.Thread(target=_graceful_exit, daemon=True).start()
                 return
+            if len(parts) == 2 and parts[1] == "batch":
+                # 原子批量写：复合动作（完成节点 = 置完成 + 记报工）必须同生共死
+                return self._json(200, deskdb.batch(DB_PATH, body.get("ops") or []))
             if len(parts) < 4 or parts[1] != "db":
                 return self._json(404, {"error": "unknown api"})
             db_id = parts[2]
@@ -151,12 +171,7 @@ def _graceful_exit() -> None:
     """
     time.sleep(0.15)                      # 给响应留出发送时间
     try:
-        import sqlite3
-        conn = sqlite3.connect(DB_PATH, timeout=10)
-        try:
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        finally:
-            conn.close()
+        deskdb.close_keeper()              # checkpoint(TRUNCATE) + 关连接
     except Exception:
         traceback.print_exc()
     os._exit(0)
@@ -175,6 +190,9 @@ def main() -> None:
         ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
     except KeyboardInterrupt:
         print("\n已停止")
+    finally:
+        # 收掉常驻连接，让 SQLite 正常 checkpoint 并清理 -wal/-shm
+        deskdb.close_keeper()
 
 
 if __name__ == "__main__":

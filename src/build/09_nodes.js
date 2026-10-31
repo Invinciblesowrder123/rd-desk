@@ -189,14 +189,6 @@
     var beforeRate = (S.metrics[p.id] || {}).rate || 0;
     setSync('busy');
 
-    var jobs = [];
-    /* ① 节点置完成 ② 同时记一条报工（备注写节点名，用于连续天数与工时统计） */
-    jobs.push(db.updateRecord({
-      databaseId: '1urnMOWB0VL3RL0pNiNILG',
-      recordId: nid,
-      properties: { '已完成': { checkbox: true }, '完成日': { date: TODAY } }
-    }));
-
     var lp = {
       '项目ID': { text: p.id },
       '项目名称': { text: p.name },
@@ -205,9 +197,32 @@
       '备注': { text: n.name }
     };
     if (n.hours > 0) lp['工时分钟'] = { number: Math.round(n.hours * MIN_PER_DAY) };
-    jobs.push(db.addRecord({ databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', properties: lp }));
 
-    Promise.all(jobs).then(function () {
+    /* ① 节点置完成 ② 同时记一条报工（备注写节点名，用于连续天数与工时统计）
+       两步必须同生共死：以前并发发两个请求，服务端偶发只成功一半，
+       会留下"节点已完成但没报工"的脏状态（进度和统计对不上）。 */
+    var ops = [
+      {
+        op: 'update',
+        databaseId: TBL_NODE,
+        recordId: nid,
+        properties: { '已完成': { checkbox: true }, '完成日': { date: TODAY } }
+      },
+      { op: 'add', databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', properties: lp }
+    ];
+
+    var job = (typeof db.batch === 'function')
+      ? db.batch(ops)
+      : Promise.all([
+          db.updateRecord({
+            databaseId: TBL_NODE,
+            recordId: nid,
+            properties: { '已完成': { checkbox: true }, '完成日': { date: TODAY } }
+          }),
+          db.addRecord({ databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', properties: lp })
+        ]);
+
+    job.then(function () {
       toast('已完成「' + n.name + '」' + (n.hours > 0 ? ' · ' + fmtDays(n.hours * MIN_PER_DAY) : ''), 'ok');
       return reloadData();
     }).then(function () {
@@ -217,7 +232,7 @@
         toast('「' + p.name + '」已 100% 关闭', 'ok');
       }
     }).catch(function (err) {
-      setSync('off', '完成节点失败：没有写入云端。');
+      setSync('off', '完成节点失败：数据没有完整写入，请重试。');
       toast('完成节点失败，请重试', 'err', function () { completeNode(nid); });
       if (window.console) console.error('[node] complete failed', err);
     });
@@ -243,19 +258,27 @@
         if (!db) { toast('当前没有可用的数据存储', 'err'); return; }
         closeMask('maskConfirm');
         setSync('busy');
-        var jobs = related.map(function (l) {
-          return db.deleteRecord({ databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', recordId: l.id });
+        /* 删报工 + 改节点，同样要同生共死 */
+        var ops = related.map(function (l) {
+          return { op: 'delete', databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', recordId: l.id };
         });
-        jobs.push(db.updateRecord({
-          databaseId: '1urnMOWB0VL3RL0pNiNILG',
+        ops.push({
+          op: 'update',
+          databaseId: TBL_NODE,
           recordId: nid,
           properties: { '已完成': { checkbox: false } }
-        }));
-        Promise.all(jobs).then(function () {
+        });
+        var job = (typeof db.batch === 'function')
+          ? db.batch(ops)
+          : Promise.all(ops.map(function (op) {
+              if (op.op === 'delete') return db.deleteRecord({ databaseId: op.databaseId, recordId: op.recordId });
+              return db.updateRecord({ databaseId: op.databaseId, recordId: op.recordId, properties: op.properties });
+            }));
+        job.then(function () {
           toast('已撤销「' + n.name + '」', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '撤销失败：云端未确认。');
+          setSync('off', '撤销失败：数据没有完整写入，请重试。');
           toast('撤销失败，请重试', 'err', function () { undoNode(nid); });
           if (window.console) console.error('[node] undo failed', err);
         });
@@ -277,7 +300,7 @@
           toast('节点已删除', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '删除失败：云端未确认。');
+          setSync('off', dst('删除失败：云端未确认。', '删除失败：数据没有完整写入。'));
           toast('删除失败，请重试', 'err', function () { deleteNode(nid); });
           if (window.console) console.error('[node] delete failed', err);
         });
@@ -384,7 +407,7 @@
     }).then(function () {
       renderNodeList();
     }).catch(function (err) {
-      setSync('off', '添加节点失败：没有写入云端。');
+      setSync('off', dst('添加节点失败：没有写入云端。', '添加节点失败：没有写入本机数据库。'));
       toast('添加节点失败，请重试', 'err', addNode);
       if (window.console) console.error('[node] add failed', err);
     }).then(function () {

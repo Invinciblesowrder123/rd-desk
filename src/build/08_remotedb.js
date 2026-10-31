@@ -32,6 +32,8 @@
   /* ---------------- 列表器：轮询版本号 ---------------- */
   var listeners = [];
   var seenRev = null;
+  var seenBuild = null;
+  var staleNoticed = false;
   var pollTimer = null;
 
   function fire() {
@@ -40,9 +42,24 @@
     }
   }
 
+  /* 页面跑的是打开那一刻的构建：前端改了不刷新，就会一直用旧逻辑
+     （踩过的坑：完成节点报错、错误提示关不掉，其实都是旧版代码的表现）。
+     服务端在 /api/rev 里带上 index.html 的构建戳，变了就提醒刷新一次。 */
+  function checkBuild(build) {
+    if (typeof build !== 'number' || !build) return;
+    if (seenBuild === null) { seenBuild = build; return; }
+    if (build === seenBuild || staleNoticed) return;
+    staleNoticed = true;
+    if (window.__toast) {
+      window.__toast('页面有新版本，刷新后生效', 'err',
+        function () { window.location.reload(); }, '刷新');
+    }
+  }
+
   function poll() {
     if (document.visibilityState === 'hidden') return;
     req(API + '/rev').then(function (d) {
+      checkBuild(d.build);
       if (seenRev === null) { seenRev = d.rev; return; }
       if (d.rev !== seenRev) { seenRev = d.rev; fire(); }
     })['catch'](function () { /* 服务没起：静默，等下次轮询 */ });
@@ -100,6 +117,15 @@
         encodeURIComponent(params.recordId) + '/delete', {}).then(function (d) {
         noteRev(d);
         return {};
+      });
+    },
+
+    /* 原子批量写：复合动作（完成节点 = 置完成 + 记报工）必须同生共死，
+       否则会留下"节点已完成但没报工"的半成功状态。 */
+    batch: function (ops) {
+      return post(API + '/batch', { ops: ops || [] }).then(function (d) {
+        noteRev(d);
+        return d;
       });
     },
 

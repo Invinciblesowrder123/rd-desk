@@ -32,92 +32,141 @@
     return '<div class="n-v">' + escapeHtml(fmtMD(m.eta)) + '</div>' + gapHtml;
   }
 
-  function renderChart() {
-    var box = $('#chartCard');
+  /* ---------------- 近 14 天完成节点 ----------------
+     数据源是项目节点表（不是报工）：已完成 + 完成日落在近 14 天。
+     按负责人分组，组内按完成日倒序；组间按完成数倒序（数量优先，
+     同数按姓名），这样一眼能看到最近谁在出货。 */
+  var OWNER_COLORS = ['#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#ec4899',
+    '#8b5cf6', '#10b981', '#f97316', '#64748b', '#e11d48'];
+
+  /* 负责人头像色：按姓名哈希取色，与分组顺序无关，同人同色 */
+  function ownerColor(name) {
+    var h = 0, s = String(name || '');
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return OWNER_COLORS[Math.abs(h) % OWNER_COLORS.length];
+  }
+
+  /* 按期判定：完成日 vs 计划完成日。没排计划日的节点不评判 */
+  function nodeTiming(n) {
+    if (!n.planDate || !n.doneDate) return null;
+    var gap = dayDiff(n.planDate, n.doneDate);   /* >0 = 比计划晚 */
+    if (gap > 0) return { cls: 'late', txt: '拖 ' + gap + ' 天' };
+    if (gap < 0) return { cls: 'on-time', txt: '提前 ' + (-gap) + ' 天' };
+    return { cls: 'on-time', txt: '按期' };
+  }
+
+  function renderDoneNodes() {
+    var box = $('#doneCard');
     if (!box) return;
 
     var days = [];
     for (var i = 13; i >= 0; i--) days.push(addDays(TODAY, -i));
+    var start = days[0], end = days[13];
 
-    var byPid = buildIndex();
-    var totals = days.map(function (d) {
-      var t = 0;
-      S.projects.forEach(function (p) {
-        var rec = (byPid[p.id] || {})[d];
-        if (rec) t += rec.min || 0;
-      });
-      return t;
+    var projById = {};
+    S.projects.forEach(function (p) { projById[p.id] = p; });
+
+    var done = [];
+    S.nodes.forEach(function (n) {
+      if (!n.done || !n.doneDate) return;
+      if (n.doneDate < start || n.doneDate > end) return;
+      done.push(n);
     });
-    var maxTotal = Math.max.apply(null, totals.concat([0]));
 
-    var head = '<div class="card-h"><h2>' + icon('clock', 'ico-sm') + '近 14 天投入工时</h2>' +
-      '<span class="muted tiny">' + escapeHtml(fmtMD(days[0])) + '–' + escapeHtml(fmtMD(days[13])) + ' · 分项目堆叠（单位：天）</span></div>';
+    var head = '<div class="card-h"><h2>' + icon('check', 'ico-sm') + '近 14 天完成节点</h2>' +
+      '<span class="muted tiny">' + escapeHtml(fmtMD(start)) + '–' + escapeHtml(fmtMD(end)) + ' · 按负责人汇总</span></div>';
 
-    if (!maxTotal) {
-      box.innerHTML = head + '<div class="empty" style="padding:26px 16px">' +
-        '<b>还没有填写工时的记录</b>报工时填了「投入工时」，这里才会长出柱子。没填的记录不会被硬凑成柱子。</div>';
+    if (!done.length) {
+      box.innerHTML = head + '<div class="empty">' +
+        '<div class="e-ico">' + icon('check') + '</div>' +
+        '<b>近 14 天还没有完成的节点</b>在「今日」把节点一键标成完成，这里就会按负责人自动汇总出来。</div>';
       return;
     }
 
-    var W = 720, H = 216, padL = 36, padR = 8, padT = 12, padB = 28;
-    var plotW = W - padL - padR, plotH = H - padT - padB;
-    var slot = plotW / days.length;
-    var barW = slot * 0.56;
+    /* 每日完成节奏：14 根迷你柱，零增长的日子留灰底，缺口一眼可见 */
+    var dayCount = {};
+    days.forEach(function (d) { dayCount[d] = 0; });
+    done.forEach(function (n) { dayCount[n.doneDate]++; });
+    var maxDay = 0;
+    days.forEach(function (d) { if (dayCount[d] > maxDay) maxDay = dayCount[d]; });
 
-    /* 纵轴按 0.5 天台阶取刻度，保证每条线都是半天倍数 */
-    var maxDays = maxTotal / MIN_PER_DAY;
-    var stepDays = 0.5;
-    while (maxDays / stepDays > 5) stepDays = Math.round((stepDays + 0.5) * 2) / 2;
-    var gridCount = Math.max(1, Math.ceil(maxDays / stepDays));
-    var maxMin = gridCount * stepDays * MIN_PER_DAY;
-    if (maxMin <= 0) { maxMin = HALF_DAY; gridCount = 1; stepDays = 0.5; }
-
-    var parts = ['<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="近 14 天投入工时堆叠柱状图">'];
-
-    /* 网格 */
-    for (var g = 0; g <= gridCount; g++) {
-      var y = padT + plotH - (plotH * g / gridCount);
-      parts.push('<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y.toFixed(1) +
-        '" stroke="#eef1f8" stroke-width="1"/>');
-      parts.push('<text x="' + (padL - 7) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="9" fill="#9aa3b8">' +
-        (g * stepDays) + 'd</text>');
-    }
-
-    /* 柱子 */
-    days.forEach(function (d, idx) {
-      var x = padL + idx * slot + (slot - barW) / 2;
-      var accH = 0;
-      S.projects.forEach(function (p) {
-        var rec = (byPid[p.id] || {})[d];
-        var min = rec ? (rec.min || 0) : 0;
-        if (!min) return;   /* 未填工时：不占高度 */
-        var h = (min / maxMin) * plotH;
-        var y = padT + plotH - accH - h;
-        parts.push('<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barW.toFixed(1) +
-          '" height="' + Math.max(1, h).toFixed(1) + '" rx="2.5" fill="' + escapeHtml(p.color || PALETTE[0]) + '">' +
-          '<title>' + escapeHtml(p.name + ' · ' + fmtMD(d) + ' · ' + fmtDays(min)) + '</title></rect>');
-        accH += h;
-      });
-
-      /* 当天合计标签只在最高那几根上标 */
-      if (totals[idx] > 0) {
-        var ty = padT + plotH - accH - 5;
-        parts.push('<text x="' + (x + barW / 2).toFixed(1) + '" y="' + ty.toFixed(1) + '" text-anchor="middle" font-size="9" fill="#6b7590">' +
-          (Math.round(totals[idx] / MIN_PER_DAY * 2) / 2) + '</text>');
-      }
-
-      parts.push('<text x="' + (x + barW / 2).toFixed(1) + '" y="' + (H - 9) + '" text-anchor="middle" font-size="9" fill="#9aa3b8">' +
-        Number(d.split('-')[2]) + '</text>');
-    });
-
-    parts.push('<line x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (W - padR) + '" y2="' + (padT + plotH) + '" stroke="#dfe5f2" stroke-width="1"/>');
-    parts.push('</svg>');
-
-    var legend = '<div class="legend">' + S.projects.map(function (p) {
-      return '<span><i style="background:' + escapeHtml(p.color || PALETTE[0]) + '"></i>' + escapeHtml(p.name) + '</span>';
+    var flowHtml = '<div class="dn-flow">' + days.map(function (d) {
+      var c = dayCount[d];
+      var h = c ? Math.max(5, Math.round(c / maxDay * 40)) : 2;
+      return '<div class="dn-day' + (d === TODAY ? ' today' : '') + '" title="' +
+        escapeHtml(fmtMD(d) + ' · ' + c + ' 个节点') + '">' +
+        '<div class="dn-bar' + (c ? ' has' : ' zero') + '" style="height:' + h + 'px"></div>' +
+        '<span class="dn-dnum">' + Number(d.split('-')[2]) + '</span>' +
+        '</div>';
     }).join('') + '</div>';
 
-    box.innerHTML = head + '<div class="chart-box">' + parts.join('') + '</div>' + legend;
+    /* 摘要：总数 / 人数 / 按期拖期 */
+    var byOwner = {};
+    var onTime = 0, late = 0;
+    done.forEach(function (n) {
+      var key = n.owner || '未分配';
+      (byOwner[key] = byOwner[key] || []).push(n);
+      var t = nodeTiming(n);
+      if (t) { if (t.cls === 'late') late++; else onTime++; }
+    });
+
+    var sumHtml = '<div class="dn-sum">' +
+      '<span class="dn-chip brand">共 ' + done.length + ' 个节点</span>' +
+      '<span class="dn-chip">' + Object.keys(byOwner).length + ' 位负责人</span>' +
+      (onTime ? '<span class="dn-chip ok">按期 ' + onTime + '</span>' : '') +
+      (late ? '<span class="dn-chip bad">拖期 ' + late + '</span>' : '') +
+      '</div>';
+
+    /* 负责人分组：组间按完成数倒序，组内按完成日倒序 */
+    var groups = Object.keys(byOwner).map(function (k) {
+      return {
+        name: k,
+        list: byOwner[k].slice().sort(function (a, b) {
+          if (a.doneDate !== b.doneDate) return a.doneDate < b.doneDate ? 1 : -1;
+          return (b.seq || 0) - (a.seq || 0);
+        })
+      };
+    }).sort(function (a, b) {
+      if (b.list.length !== a.list.length) return b.list.length - a.list.length;
+      return a.name.localeCompare(b.name, 'zh');
+    });
+
+    var MAXROW = 6;
+    var groupsHtml = groups.map(function (g) {
+      var col = ownerColor(g.name);
+      var rows = g.list.slice(0, MAXROW).map(function (n) {
+        var p = projById[n.pid] || {};
+        var t = nodeTiming(n);
+        return '<div class="dn-row">' +
+          '<span class="dn-rdot" style="background:' + escapeHtml(p.color || PALETTE[0]) + '"></span>' +
+          '<div class="dn-rmain">' +
+            '<div class="dn-rname" title="' + escapeHtml(n.name) + '">' + escapeHtml(n.name) + '</div>' +
+            '<div class="dn-rsub">' + escapeHtml(p.name || '未知项目') + '</div>' +
+          '</div>' +
+          '<span class="dn-rdate">' + escapeHtml(fmtMD(n.doneDate)) + '</span>' +
+          (t ? '<span class="chip ' + t.cls + '">' + escapeHtml(t.txt) + '</span>' : '') +
+          '</div>';
+      }).join('');
+      var more = g.list.length > MAXROW
+        ? '<div class="dn-more">还有 ' + (g.list.length - MAXROW) + ' 个…</div>' : '';
+      return '<div class="dn-owner">' +
+        '<div class="dn-oh">' +
+          '<span class="dn-ava" style="background:' + col + '">' + escapeHtml(g.name.slice(0, 1)) + '</span>' +
+          '<div class="dn-oid">' +
+            '<div class="dn-oname">' + escapeHtml(g.name) + '</div>' +
+            '<div class="dn-ometa">最近完成 ' + escapeHtml(fmtMD(g.list[0].doneDate)) + '</div>' +
+          '</div>' +
+          '<span class="dn-ocount">' + g.list.length + ' 个</span>' +
+        '</div>' +
+        '<div class="dn-list">' + rows + more + '</div>' +
+        '</div>';
+    }).join('');
+
+    box.innerHTML = head +
+      '<div class="dn-top">' + sumHtml +
+        '<div class="dn-flowwrap"><span class="dn-flowt">每日完成</span>' + flowHtml + '</div>' +
+      '</div>' +
+      '<div class="dn-owners">' + groupsHtml + '</div>';
   }
 
   function renderBoard() {
@@ -125,14 +174,14 @@
     if (!grid) return;
 
     if (!S.loaded) {
-      grid.innerHTML = '<div class="card chart-card"><div class="skel" style="height:200px"></div></div>' +
+      grid.innerHTML = '<div class="card dn-card"><div class="skel" style="height:220px"></div></div>' +
         '<div class="card"><div class="skel" style="height:220px"></div></div>';
       return;
     }
 
-    var html = ['<div class="card chart-card" id="chartCard"></div>'];
+    var html = ['<div class="card dn-card" id="doneCard"></div>'];
     grid.innerHTML = html.join('');
-    renderChart();
+    renderDoneNodes();
 
     if (!S.projects.length) {
       var empty = document.createElement('div');

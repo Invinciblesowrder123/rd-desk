@@ -190,6 +190,50 @@ svg{display:block;flex:none}
 .col-side{position:sticky;top:18px;display:grid;gap:14px}
 .col-side .card + .card{margin-top:0}
 
+/* 今日 · 项目快速筛选 */
+.proj-filter{
+  background:#fff;border:1px solid var(--line);border-radius:13px;
+  box-shadow:var(--shadow);padding:11px 12px;margin-bottom:12px;
+}
+.pf-search{display:flex;align-items:center;gap:8px;min-width:0}
+.pf-search>svg{stroke:var(--ink-3);flex:none}
+.pf-search input{
+  flex:1;min-width:0;height:32px;border:none;background:transparent;
+  font-size:13.5px;color:var(--ink);padding:0;
+}
+.pf-search input::placeholder{color:var(--ink-3)}
+.pf-search input:focus{outline:none}
+.pf-clear{
+  width:24px;height:24px;border-radius:8px;display:none;place-items:center;
+  color:var(--ink-3);flex:none;background:var(--bg-2);
+}
+.pf-clear:hover{color:var(--ink);background:var(--line-2)}
+.pf-search.has-q .pf-clear{display:grid}
+.pf-count{font-size:11.5px;color:var(--ink-3);white-space:nowrap;font-variant-numeric:tabular-nums;flex:none}
+.pf-reset{
+  font-size:11.5px;font-weight:650;color:var(--brand);white-space:nowrap;flex:none;
+  padding:5px 9px;border-radius:8px;display:none;
+}
+.pf-reset:hover{background:var(--brand-soft)}
+.proj-filter.filtering .pf-reset{display:block}
+.pf-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:9px}
+.pf-lbl{font-size:10.5px;color:var(--ink-3);font-weight:600;margin-right:2px;flex:none}
+.pf-chip{
+  display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px;border-radius:8px;
+  border:1px solid var(--line-2);background:#fff;font-size:12px;font-weight:600;color:var(--ink-2);
+  transition:.14s;white-space:nowrap;
+}
+.pf-chip:hover{border-color:#c9d2e8;color:var(--ink)}
+.pf-chip em{font-style:normal;font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.pf-chip.on{background:var(--brand-soft);border-color:#c7cbff;color:var(--brand)}
+.pf-chip.on em{color:var(--brand)}
+.pf-chip.on[data-pf="status"][data-v="overdue"]{background:var(--red-soft);border-color:#f6cdd8;color:#be123c}
+.pf-chip.on[data-pf="status"][data-v="overdue"] em{color:#be123c}
+.pf-chip.on[data-pf="status"][data-v="miss"]{background:var(--amber-soft);border-color:#f3ddb4;color:#a35c05}
+.pf-chip.on[data-pf="status"][data-v="miss"] em{color:#a35c05}
+.pf-chip.on[data-pf="status"][data-v="ok"]{background:var(--green-soft);border-color:#cdeee0;color:#047857}
+.pf-chip.on[data-pf="status"][data-v="ok"] em{color:#047857}
+
 /* 项目卡 */
 .pcard{
   position:relative;background:#fff;border:1px solid var(--line);border-radius:var(--radius);
@@ -307,13 +351,45 @@ svg{display:block;flex:none}
 .lg-del{width:26px;height:26px;min-height:26px;border-radius:7px;display:grid;place-items:center;color:var(--ink-3);flex:none}
 .lg-del:hover{background:var(--red-soft);color:var(--red)}
 
-/* 堆叠柱状图 */
-.chart-card{grid-column:1/-1}
-.chart-box{overflow-x:auto;padding-bottom:2px}
-.chart-svg{width:100%;height:auto;display:block;min-width:520px}
-.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px}
-.legend span{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-2)}
-.legend i{width:9px;height:9px;border-radius:3px;flex:none}
+/* ---------- 看板：近 14 天完成节点 ---------- */
+.dn-card{grid-column:1/-1}
+.dn-top{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.dn-sum{display:flex;gap:7px;flex-wrap:wrap}
+.dn-chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:8px;
+  font-size:11.5px;font-weight:650;background:var(--bg-2);color:var(--ink-2);font-variant-numeric:tabular-nums}
+.dn-chip.brand{background:var(--brand-soft);color:var(--brand)}
+.dn-chip.ok{background:var(--green-soft);color:#047857}
+.dn-chip.bad{background:var(--red-soft);color:#be123c}
+.dn-flowwrap{display:flex;align-items:flex-end;gap:10px;flex:1;min-width:0;max-width:600px}
+.dn-flowt{font-size:10.5px;color:var(--ink-3);white-space:nowrap;padding-bottom:15px}
+.dn-flow{display:flex;align-items:flex-end;gap:5px;flex:1;min-width:0}
+.dn-day{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px}
+.dn-bar{width:100%;max-width:20px;border-radius:4px 4px 2px 2px}
+.dn-bar.has{background:linear-gradient(180deg,#8b93f7,var(--brand))}
+.dn-bar.zero{background:#edf0f8}
+.dn-day.today .dn-bar.has{background:linear-gradient(180deg,#34d399,var(--green))}
+.dn-dnum{font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;line-height:1}
+.dn-day.today .dn-dnum{color:var(--green);font-weight:700}
+.dn-owners{display:grid;grid-template-columns:repeat(auto-fill,minmax(252px,1fr));gap:10px}
+.dn-owner{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;transition:.16s}
+.dn-owner:hover{border-color:var(--line-2);box-shadow:var(--shadow)}
+.dn-oh{display:flex;align-items:center;gap:9px}
+.dn-ava{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:#fff;
+  font-size:13px;font-weight:750;flex:none}
+.dn-oid{flex:1;min-width:0}
+.dn-oname{font-size:13px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dn-ometa{font-size:10.5px;color:var(--ink-3);margin-top:1px}
+.dn-ocount{flex:none;font-size:11px;font-weight:750;color:var(--green);background:var(--green-soft);
+  border-radius:7px;padding:2px 8px;font-variant-numeric:tabular-nums}
+.dn-list{margin-top:9px;display:grid;gap:6px}
+.dn-row{display:flex;align-items:center;gap:8px}
+.dn-row .chip{flex:none}
+.dn-rdot{width:7px;height:7px;border-radius:2px;flex:none}
+.dn-rmain{flex:1;min-width:0}
+.dn-rname{font-size:12px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dn-rsub{font-size:10.5px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.dn-rdate{flex:none;font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.dn-more{font-size:10.5px;color:var(--ink-3);padding-top:2px}
 
 /* ---------- 周报 ---------- */
 .week-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -427,6 +503,14 @@ svg{display:block;flex:none}
 .toast.err{background:#8f1731}
 .toast.ok{background:#065f46}
 .toast button{color:#fff;font-size:12px;font-weight:700;padding:5px 9px;border-radius:7px;background:rgba(255,255,255,.18)}
+.toast button:hover{background:rgba(255,255,255,.3)}
+.toast .t-close{
+  display:flex;align-items:center;justify-content:center;
+  width:24px;height:24px;padding:0;flex:0 0 auto;
+  background:transparent;opacity:.7;border-radius:6px;
+}
+.toast .t-close:hover{background:rgba(255,255,255,.18);opacity:1}
+.toast .t-close .ico{width:13px;height:13px}
 @keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* ---------- 骨架 ---------- */
@@ -529,6 +613,12 @@ svg{display:block;flex:none}
   .head-actions .btn{flex:1}
   .kpi-strip{grid-template-columns:repeat(2,1fr);gap:8px}
   .kpi{padding:10px 11px}
+  /* 筛选模块：触屏下 chip 加高，搜索行允许换行 */
+  .proj-filter{padding:10px}
+  .pf-search{flex-wrap:wrap;row-gap:6px}
+  .pf-search input{height:36px}
+  .pf-chip{height:32px;padding:0 12px}
+  .pf-reset{padding:8px 10px}
   .kpi .k-val{font-size:18px}
   .p-metrics{grid-template-columns:repeat(2,1fr)}
   .card{padding:14px;border-radius:14px}
@@ -560,6 +650,10 @@ svg{display:block;flex:none}
   .node-hero .btn{width:100%}
   .node-bar{font-size:11px}
   .lg-row{padding:7px 0}
+  .dn-flow{gap:3px}
+  .dn-bar{max-width:14px}
+  .dn-flowt{display:none}
+  .dn-top{margin-bottom:12px}
 }
 @media (max-width:360px){
   .kpi-strip{grid-template-columns:1fr 1fr}
@@ -598,6 +692,7 @@ svg{display:block;flex:none}
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11M7.5 10.5 12 15l4.5-4.5M4.5 19.5h15"/></symbol>
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5v-11M7.5 8.5 12 4l4.5 4.5M4.5 19.5h15"/></symbol>
   <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4.5h11l3.5 3.5v11.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1z"/><path d="M8 4.5v5h7v-5M8 20.5V14h8v6.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></symbol>
 </svg>
 
 <div class="shell">
@@ -666,6 +761,18 @@ svg{display:block;flex:none}
               <h2><svg class="ico ico-sm"><use href="#i-bolt"/></svg>可直接报工</h2>
               <span class="muted tiny" id="listHint">按建议量预填，可改</span>
             </div>
+            <!-- 项目快速筛选：阶段 / 状态 / 关键词，只作用于下方列表 -->
+            <div class="proj-filter" id="projFilter">
+              <div class="pf-search" id="pfSearch">
+                <svg class="ico ico-sm"><use href="#i-search"/></svg>
+                <input id="pfQ" type="text" placeholder="搜项目名 / 客户，如：冰淇淋" autocomplete="off">
+                <button class="pf-clear" id="pfQClear" type="button" aria-label="清空搜索"><svg class="ico ico-sm"><use href="#i-close"/></svg></button>
+                <span class="pf-count" id="pfCount"></span>
+                <button class="pf-reset" id="pfReset" type="button">重置</button>
+              </div>
+              <div class="pf-row" id="pfStageRow"><span class="pf-lbl">阶段</span></div>
+              <div class="pf-row" id="pfStatusRow"><span class="pf-lbl">状态</span></div>
+            </div>
             <div id="projList"></div>
             <button class="new-entry" id="btnNewBottom">
               <svg class="ico"><use href="#i-plus"/></svg>新建一个研发项目
@@ -681,7 +788,7 @@ svg{display:block;flex:none}
         <div class="page-head">
           <div>
             <h1>项目看板</h1>
-            <div class="sub"><svg class="ico ico-sm"><use href="#i-layers"/></svg><span>进度环 · 核心数字 · 报工记录 · 14 天工时</span></div>
+            <div class="sub"><svg class="ico ico-sm"><use href="#i-layers"/></svg><span>进度环 · 核心数字 · 报工记录 · 14 天完成节点</span></div>
           </div>
         </div>
         <div class="board-grid" id="boardGrid"></div>
@@ -1000,6 +1107,8 @@ svg{display:block;flex:none}
   /* ---------------- 列表器：轮询版本号 ---------------- */
   var listeners = [];
   var seenRev = null;
+  var seenBuild = null;
+  var staleNoticed = false;
   var pollTimer = null;
 
   function fire() {
@@ -1008,9 +1117,24 @@ svg{display:block;flex:none}
     }
   }
 
+  /* 页面跑的是打开那一刻的构建：前端改了不刷新，就会一直用旧逻辑
+     （踩过的坑：完成节点报错、错误提示关不掉，其实都是旧版代码的表现）。
+     服务端在 /api/rev 里带上 index.html 的构建戳，变了就提醒刷新一次。 */
+  function checkBuild(build) {
+    if (typeof build !== 'number' || !build) return;
+    if (seenBuild === null) { seenBuild = build; return; }
+    if (build === seenBuild || staleNoticed) return;
+    staleNoticed = true;
+    if (window.__toast) {
+      window.__toast('页面有新版本，刷新后生效', 'err',
+        function () { window.location.reload(); }, '刷新');
+    }
+  }
+
   function poll() {
     if (document.visibilityState === 'hidden') return;
     req(API + '/rev').then(function (d) {
+      checkBuild(d.build);
       if (seenRev === null) { seenRev = d.rev; return; }
       if (d.rev !== seenRev) { seenRev = d.rev; fire(); }
     })['catch'](function () { /* 服务没起：静默，等下次轮询 */ });
@@ -1068,6 +1192,15 @@ svg{display:block;flex:none}
         encodeURIComponent(params.recordId) + '/delete', {}).then(function (d) {
         noteRev(d);
         return {};
+      });
+    },
+
+    /* 原子批量写：复合动作（完成节点 = 置完成 + 记报工）必须同生共死，
+       否则会留下"节点已完成但没报工"的半成功状态。 */
+    batch: function (ops) {
+      return post(API + '/batch', { ops: ops || [] }).then(function (d) {
+        noteRev(d);
+        return d;
       });
     },
 
@@ -1129,6 +1262,8 @@ svg{display:block;flex:none}
     syncState: 'ok',
     editingId: null,
     reportPid: null,
+    /* 今日页项目快速筛选（阶段 / 状态 / 关键词），刷新数据不清空 */
+    projFilter: { stage: '', status: '', q: '' },
     confetti: {},
     selColor: PALETTE[0],
     kptWeek: '',
@@ -1355,6 +1490,13 @@ svg{display:block;flex:none}
   }
 
   /* ---------------- 同步状态 ---------------- */
+
+  /* 本地版没有"云端"，文案要跟着变，否则用户看到"没写入云端"会以为要去连网。
+     用法：dst(cloudText, localText) */
+  function dst(cloudText, localText) {
+    return LOCAL ? localText : cloudText;
+  }
+
   function setSync(state, msg) {
     S.syncState = state;
     if (state === 'ok') S.lastSync = new Date();
@@ -1401,28 +1543,66 @@ svg{display:block;flex:none}
   }
 
   /* ---------------- 提示 ---------------- */
-  function toast(msg, kind, retry) {
+  /* 每条 toast 都自带关闭按钮，并且都会自动消失：
+     错误类停留久一点（12s，给用户看清并按"重试"），普通 3.4s。
+     鼠标悬停时暂停倒计时，方便用户去点重试按钮。 */
+  var TOAST_TTL = { ok: 3400, info: 3400, err: 12000 };
+
+  function toast(msg, kind, retry, retryText) {
     var wrap = $('#toastWrap');
     if (!wrap) return;
     var t = document.createElement('div');
     t.className = 'toast ' + (kind || '');
     var icoName = kind === 'ok' ? 'check' : (kind === 'err' ? 'alert' : 'info');
     t.innerHTML = icon(icoName, 'ico-sm') + '<span class="t-msg">' + escapeHtml(msg) + '</span>';
+
+    var timer = null;
+    var left = TOAST_TTL[kind || 'info'] || 3400;
+
+    function dismiss() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (t.parentNode) t.parentNode.removeChild(t);
+    }
+
+    function start() {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(dismiss, left);
+    }
+
+    function pause() {
+      if (timer) { clearTimeout(timer); timer = null; }
+    }
+
     if (typeof retry === 'function') {
       var b = document.createElement('button');
-      b.textContent = '重试';
+      b.className = 't-retry';
+      b.textContent = retryText || '重试';
       b.onclick = function () {
-        if (t.parentNode) t.parentNode.removeChild(t);
+        dismiss();
         retry();
       };
       t.appendChild(b);
-    } else {
-      setTimeout(function () {
-        if (t.parentNode) t.parentNode.removeChild(t);
-      }, 3400);
     }
+
+    /* 关闭按钮：任何一条 toast 都能手动关掉 */
+    var x = document.createElement('button');
+    x.className = 't-close';
+    x.setAttribute('aria-label', '关闭提示');
+    x.innerHTML = icon('close', 'ico-sm');
+    x.onclick = function () { dismiss(); };
+    t.appendChild(x);
+
+    t.addEventListener('mouseenter', pause);
+    t.addEventListener('mouseleave', start);
+
     wrap.appendChild(t);
+    start();
+    return { dismiss: dismiss };
   }
+
+  /* 适配层（08_remotedb.js）在独立作用域里，靠这个拿到提示能力：
+     例如"页面有新版本，请刷新"这类由轮询触发的提示 */
+  window.__toast = toast;
 
   /* ---------------- 弹窗 ---------------- */
   function openMask(id) {
@@ -1479,6 +1659,16 @@ svg{display:block;flex:none}
     var remainNodes = Math.max(0, nodeTotal - nodeDone);
     var rate = nodeTotal > 0 ? nodeDone / nodeTotal : 0;
     var dLeft = p.due ? dayDiff(TODAY, p.due) : 0;
+
+    /* 到期未完成节点：计划完成日已经到了（或更早）却还没关掉的节点。
+       研发项目不是每天都有阶段性进展——缺报提醒只对"确实有事欠着"的
+       项目出；节点全排在未来的项目不该被催（2026-10-30 用户提出）。
+       注意 dayDiff(a, b) 的语义是 b - a，所以"planDate ≤ 今天"要写 >= 0。 */
+    var dueNodes = 0;
+    nodes.forEach(function (n) {
+      if (n.done) return;
+      if (n.planDate && dayDiff(n.planDate, TODAY) >= 0) dueNodes++;
+    });
 
     /* 投入工时仍来自报工记录（工时是投入，与节点进度分开看） */
     var dates = Object.keys(byDate || {});
@@ -1541,6 +1731,7 @@ svg{display:block;flex:none}
       etaNote: etaNote,
       todayNodes: todayNodes,
       todayMin: todayMin,
+      dueNodes: dueNodes,
       overdue: (dLeft < 0 && remainNodes > 0) ? -dLeft : 0,
       logDays: dates.length,
       minSum: minSum,
@@ -1557,7 +1748,9 @@ svg{display:block;flex:none}
     return byPid;
   }
 
-  /* 每个项目只出一条待处理，优先级：逾期 > 连续缺报 > 缓冲日 */
+  /* 每个项目只出一条待处理，优先级：逾期 > 连续缺报 > 缓冲日。
+     缺报两类只对"当天或更早还有没报工的节点"的项目出（dueNodes > 0）：
+     研发不是每天都有进展，节点全排在未来的项目别去催它。 */
   function attentionList() {
     var out = [];
     S.projects.forEach(function (p) {
@@ -1565,8 +1758,8 @@ svg{display:block;flex:none}
       if (!m) return;
       var kind = null;
       if (m.overdue > 0) kind = 'overdue';
-      else if (m.yStatus === 'broken') kind = 'broken';
-      else if (m.yStatus === 'buffer') kind = 'buffer';
+      else if (m.dueNodes > 0 && m.yStatus === 'broken') kind = 'broken';
+      else if (m.dueNodes > 0 && m.yStatus === 'buffer') kind = 'buffer';
       if (!kind) return;
       out.push({ kind: kind, p: p, m: m, w: kind === 'overdue' ? 1 : (kind === 'broken' ? 2 : 3) });
     });
@@ -1624,7 +1817,7 @@ svg{display:block;flex:none}
     var sub = $('#todaySub');
     if (!sub) return;
     if (!S.loaded) {
-      sub.innerHTML = icon('clock', 'ico-sm') + '<span>正在读取云端数据…</span>';
+      sub.innerHTML = icon('clock', 'ico-sm') + '<span>' + dst('正在读取云端数据…', '正在读取本机数据…') + '</span>';
       return;
     }
     var n = S.projects.length;
@@ -1664,6 +1857,117 @@ svg{display:block;flex:none}
     }).join('');
   }
 
+  /* ============================================================
+     项目快速筛选（只作用于「可直接报工」列表）
+     口径与 attentionList / sortedProjects 对齐：逾期 > 昨日缺报 > 正常
+     ============================================================ */
+  /* 阶段候选项：优先云端 schema 回填，与新建项目弹窗一致 */
+  function stageList() {
+    var opts = (window.__SCHEMA_OPTIONS && window.__SCHEMA_OPTIONS['阶段']) || null;
+    return opts && opts.length ? opts.map(function (o) { return o.text; }) : STAGES;
+  }
+
+  function statusOf(p) {
+    var m = S.metrics[p.id] || {};
+    if (m.overdue > 0) return 'overdue';
+    if (m.yStatus === 'broken' || m.yStatus === 'buffer') return 'miss';
+    return 'ok';
+  }
+
+  function pfCounts() {
+    var byStage = {}, byStatus = { overdue: 0, miss: 0, ok: 0 };
+    S.projects.forEach(function (p) {
+      var st = p.stage || '设计';
+      byStage[st] = (byStage[st] || 0) + 1;
+      byStatus[statusOf(p)]++;
+    });
+    return { stage: byStage, status: byStatus, total: S.projects.length };
+  }
+
+  function filteredProjects() {
+    var f = S.projFilter;
+    var q = (f.q || '').toLowerCase();
+    return sortedProjects().filter(function (p) {
+      if (f.stage && (p.stage || '设计') !== f.stage) return false;
+      if (f.status && statusOf(p) !== f.status) return false;
+      if (q && String(p.name).toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+  }
+
+  function pfActive() {
+    var f = S.projFilter;
+    return !!(f.stage || f.status || f.q);
+  }
+
+  function syncPfSearchUi() {
+    var wrap = $('#pfSearch'), q = $('#pfQ');
+    if (wrap && q) wrap.classList.toggle('has-q', !!q.value);
+  }
+
+  function updatePfCount() {
+    var el = $('#pfCount');
+    if (!el) return;
+    var total = S.projects.length;
+    el.textContent = pfActive()
+      ? ('显示 ' + filteredProjects().length + ' / ' + total + ' 个')
+      : ('共 ' + total + ' 个项目');
+  }
+
+  function pfChip(group, value, label, n, on) {
+    return '<button type="button" class="pf-chip' + (on ? ' on' : '') + '" data-pf="' + group +
+      '" data-v="' + escapeHtml(value) + '">' + escapeHtml(label) +
+      (n == null ? '' : '<em>' + n + '</em>') + '</button>';
+  }
+
+  /* 只重绘两个 chips 行；搜索框是静态 HTML，重绘会丢焦点和事件 */
+  function renderProjFilter() {
+    var box = $('#projFilter');
+    if (!box) return;
+    if (!S.loaded) { box.classList.add('hide'); return; }
+    box.classList.remove('hide');
+
+    var c = pfCounts(), f = S.projFilter;
+
+    var stageRow = $('#pfStageRow');
+    if (stageRow) {
+      var sHtml = '<span class="pf-lbl">阶段</span>' + pfChip('stage', '', '全部', c.total, !f.stage);
+      stageList().forEach(function (st) {
+        sHtml += pfChip('stage', st, st, c.stage[st] || 0, f.stage === st);
+      });
+      stageRow.innerHTML = sHtml;
+    }
+
+    var statusRow = $('#pfStatusRow');
+    if (statusRow) {
+      var rows = [
+        ['', '全部', c.total],
+        ['overdue', '逾期', c.status.overdue],
+        ['miss', '昨日缺报', c.status.miss],
+        ['ok', '节奏正常', c.status.ok]
+      ];
+      var tHtml = '<span class="pf-lbl">状态</span>';
+      rows.forEach(function (r) {
+        tHtml += pfChip('status', r[0], r[1], r[2], f.status === r[0]);
+      });
+      statusRow.innerHTML = tHtml;
+    }
+
+    box.classList.toggle('filtering', pfActive());
+    updatePfCount();
+  }
+
+  function resetProjFilter() {
+    S.projFilter.stage = '';
+    S.projFilter.status = '';
+    S.projFilter.q = '';
+    var q = $('#pfQ');
+    if (q) q.value = '';
+    syncPfSearchUi();
+    renderProjFilter();
+    renderProjects();
+  }
+
   /* 今天要处理 */
   function renderAttn() {
     var box = $('#attnWrap');
@@ -1676,7 +1980,7 @@ svg{display:block;flex:none}
 
     var html = ['<div class="attn-head"><h2>' + icon('alert', 'ico-sm') +
       '今天要处理<span class="chip" style="background:var(--red-soft);color:#be123c">' + list.length + '</span></h2>' +
-      '<span class="muted tiny">逾期与缺报会自动滚入今天</span></div><div class="attn-list">'];
+      '<span class="muted tiny">只列当天及更早还有未报工节点的项目</span></div><div class="attn-list">'];
 
     list.forEach(function (it) {
       var p = it.p, m = it.m;
@@ -1702,7 +2006,7 @@ svg{display:block;flex:none}
             '<div class="a-ico">' + icon('clock') + '</div>' +
             '<div class="a-body">' +
               '<div class="a-title">' + escapeHtml(p.name) + '<span class="chip late">连续缺报</span></div>' +
-              '<div class="a-desc">昨日（' + escapeHtml(fmtMD(addDays(TODAY, -1))) + '）未报工，本周缓冲日已用完，连续记录断在此处。现在补记还能救回来。</div>' +
+              '<div class="a-desc">昨日（' + escapeHtml(fmtMD(addDays(TODAY, -1))) + '）未报工，本周缓冲日已用完，连续记录断在此处。还有 ' + m.dueNodes + ' 个节点计划已到还没关，今天推进一下再补记。</div>' +
             '</div>' +
             '<div class="a-actions">' +
               '<button class="btn btn-sm btn-primary" data-act="report" data-pid="' + escapeHtml(p.id) + '">立即报工</button>' +
@@ -1715,7 +2019,7 @@ svg{display:block;flex:none}
             '<div class="a-ico">' + icon('shield') + '</div>' +
             '<div class="a-body">' +
               '<div class="a-title">' + escapeHtml(p.name) + '<span class="chip buf">缓冲日</span></div>' +
-              '<div class="a-desc">昨日未报工，已自动用掉本周 1 个缓冲日，连续 ' + m.streak + ' 天保留未断。今天补上，节奏就还在。</div>' +
+              '<div class="a-desc">昨日未报工，已自动用掉本周 1 个缓冲日，连续 ' + m.streak + ' 天保留未断。有 ' + m.dueNodes + ' 个节点计划已到，今天补上，节奏就还在。</div>' +
             '</div>' +
             '<div class="a-actions">' +
               '<button class="btn btn-sm btn-primary" data-act="report" data-pid="' + escapeHtml(p.id) + '">立即报工</button>' +
@@ -1752,8 +2056,20 @@ svg{display:block;flex:none}
       return;
     }
 
+    var list = filteredProjects();
+    if (!list.length) {
+      /* 有项目但被筛空了：给一条明确的退路，而不是空白 */
+      box.innerHTML = '<div class="empty"><div class="e-ico">' + icon('search') + '</div>' +
+        '<b>没有符合筛选条件的项目</b>换个关键词或阶段试试，也可以直接看全部 ' + S.projects.length + ' 个项目。' +
+        '<div style="margin-top:12px"><button class="btn btn-sm" data-act="clear-filter">重置筛选</button></div></div>';
+      var hint0 = $('#listHint');
+      if (hint0) hint0.textContent = '筛选中 · 0 / ' + S.projects.length + ' 个项目';
+      updatePfCount();
+      return;
+    }
+
     var html = [];
-    sortedProjects().forEach(function (p) {
+    list.forEach(function (p) {
       var m = S.metrics[p.id] || {};
       var color = p.color || PALETTE[0];
       var stageCls = 'stage-' + (p.stage || '设计');
@@ -1851,7 +2167,12 @@ svg{display:block;flex:none}
     box.innerHTML = html.join('');
 
     var hint = $('#listHint');
-    if (hint) hint.textContent = '点「完成节点」即记一次报工 · ' + S.projects.length + ' 个项目';
+    if (hint) {
+      hint.textContent = pfActive()
+        ? '筛选中 · ' + list.length + ' / ' + S.projects.length + ' 个项目'
+        : '点「完成节点」即记一次报工 · ' + S.projects.length + ' 个项目';
+    }
+    updatePfCount();
   }
 
   /* 右侧风险栏 */
@@ -1964,7 +2285,7 @@ svg{display:block;flex:none}
     };
 
     var db = sdk();
-    if (!db) { toast('当前未连接云端，改动无法保存', 'err', function () { saveProject(); }); return; }
+    if (!db) { toast(dst('当前未连接云端，改动无法保存', '当前没有可用的数据存储，改动无法保存'), 'err', function () { saveProject(); }); return; }
 
     var btn = $('#projSave');
     btn.disabled = true;
@@ -1981,8 +2302,9 @@ svg{display:block;flex:none}
       closeMask('maskProj');
       return reloadData();
     }).catch(function (err) {
-      setSync('off', '写入失败：改动没有保存到云端，请检查网络后重试。');
-      toast('保存失败，数据未写入云端', 'err', function () { saveProject(); });
+      setSync('off', dst('写入失败：改动没有保存到云端，请检查网络后重试。',
+        '写入失败：改动没有保存到本机数据库，请重试。'));
+      toast(dst('保存失败，数据未写入云端', '保存失败，数据未写入本机数据库'), 'err', function () { saveProject(); });
       if (window.console) console.error('[project] save failed', err);
     }).then(function () {
       btn.disabled = false;
@@ -1997,10 +2319,10 @@ svg{display:block;flex:none}
     var mine = S.logs.filter(function (l) { return l.pid === id; });
 
     askConfirm('删除项目？',
-      '将删除 <b>' + escapeHtml(p.name) + '</b> 及其 ' + mine.length + ' 条报工记录。<br><br>这个动作不可恢复，云端数据会一并清除。',
+      '将删除 <b>' + escapeHtml(p.name) + '</b> 及其 ' + mine.length + ' 条报工记录。<br><br>这个动作不可恢复，' + dst('云端数据会一并清除。', '本机数据会一并清除。'),
       '确认删除', function () {
         var db = sdk();
-        if (!db) { toast('当前未连接云端', 'err'); return; }
+        if (!db) { toast(dst('当前未连接云端', '当前没有可用的数据存储'), 'err'); return; }
         closeMask('maskConfirm');
         setSync('busy');
         var jobs = mine.map(function (l) {
@@ -2012,7 +2334,7 @@ svg{display:block;flex:none}
           toast('项目已删除', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '删除失败：云端未确认，数据可能仍在。');
+          setSync('off', dst('删除失败：云端未确认，数据可能仍在。', '删除失败：数据没有完整写入，可能仍在。'));
           toast('删除失败，请重试', 'err', function () { deleteProject(id); });
           if (window.console) console.error('[project] delete failed', err);
         });
@@ -2022,14 +2344,14 @@ svg{display:block;flex:none}
   function deleteLog(id) {
     askConfirm('删除这条报工记录？', '删除后该日的推进量与工时都会从统计中移除，不可恢复。', '确认删除', function () {
       var db = sdk();
-      if (!db) { toast('当前未连接云端', 'err'); return; }
+      if (!db) { toast(dst('当前未连接云端', '当前没有可用的数据存储'), 'err'); return; }
       closeMask('maskConfirm');
       setSync('busy');
       db.deleteRecord({ databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', recordId: id }).then(function () {
         toast('记录已删除', 'ok');
         return reloadData();
       }).catch(function (err) {
-        setSync('off', '删除失败：云端未确认。');
+        setSync('off', dst('删除失败：云端未确认。', '删除失败：数据没有完整写入。'));
         toast('删除失败，请重试', 'err', function () { deleteLog(id); });
         if (window.console) console.error('[log] delete failed', err);
       });
@@ -2097,7 +2419,7 @@ svg{display:block;flex:none}
     if (workMin > 0) props['工时分钟'] = { number: workMin };
 
     var db = sdk();
-    if (!db) { toast('当前未连接云端，报工无法保存', 'err', function () { saveReport(); }); return; }
+    if (!db) { toast(dst('当前未连接云端，报工无法保存', '当前没有可用的数据存储，报工无法保存'), 'err', function () { saveReport(); }); return; }
 
     var btn = $('#repSave');
     btn.disabled = true;
@@ -2118,7 +2440,7 @@ svg{display:block;flex:none}
         toast('「' + p.name + '」已 100% 关闭', 'ok');
       }
     }).catch(function (err) {
-      setSync('off', '报工失败：这条记录没有写入云端。');
+      setSync('off', dst('报工失败：这条记录没有写入云端。', '报工失败：这条记录没有写入本机数据库。'));
       toast('报工失败，数据未保存', 'err', function () { saveReport(); });
       if (window.console) console.error('[report] save failed', err);
     }).then(function () {
@@ -2160,92 +2482,141 @@ svg{display:block;flex:none}
     return '<div class="n-v">' + escapeHtml(fmtMD(m.eta)) + '</div>' + gapHtml;
   }
 
-  function renderChart() {
-    var box = $('#chartCard');
+  /* ---------------- 近 14 天完成节点 ----------------
+     数据源是项目节点表（不是报工）：已完成 + 完成日落在近 14 天。
+     按负责人分组，组内按完成日倒序；组间按完成数倒序（数量优先，
+     同数按姓名），这样一眼能看到最近谁在出货。 */
+  var OWNER_COLORS = ['#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b', '#ec4899',
+    '#8b5cf6', '#10b981', '#f97316', '#64748b', '#e11d48'];
+
+  /* 负责人头像色：按姓名哈希取色，与分组顺序无关，同人同色 */
+  function ownerColor(name) {
+    var h = 0, s = String(name || '');
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return OWNER_COLORS[Math.abs(h) % OWNER_COLORS.length];
+  }
+
+  /* 按期判定：完成日 vs 计划完成日。没排计划日的节点不评判 */
+  function nodeTiming(n) {
+    if (!n.planDate || !n.doneDate) return null;
+    var gap = dayDiff(n.planDate, n.doneDate);   /* >0 = 比计划晚 */
+    if (gap > 0) return { cls: 'late', txt: '拖 ' + gap + ' 天' };
+    if (gap < 0) return { cls: 'on-time', txt: '提前 ' + (-gap) + ' 天' };
+    return { cls: 'on-time', txt: '按期' };
+  }
+
+  function renderDoneNodes() {
+    var box = $('#doneCard');
     if (!box) return;
 
     var days = [];
     for (var i = 13; i >= 0; i--) days.push(addDays(TODAY, -i));
+    var start = days[0], end = days[13];
 
-    var byPid = buildIndex();
-    var totals = days.map(function (d) {
-      var t = 0;
-      S.projects.forEach(function (p) {
-        var rec = (byPid[p.id] || {})[d];
-        if (rec) t += rec.min || 0;
-      });
-      return t;
+    var projById = {};
+    S.projects.forEach(function (p) { projById[p.id] = p; });
+
+    var done = [];
+    S.nodes.forEach(function (n) {
+      if (!n.done || !n.doneDate) return;
+      if (n.doneDate < start || n.doneDate > end) return;
+      done.push(n);
     });
-    var maxTotal = Math.max.apply(null, totals.concat([0]));
 
-    var head = '<div class="card-h"><h2>' + icon('clock', 'ico-sm') + '近 14 天投入工时</h2>' +
-      '<span class="muted tiny">' + escapeHtml(fmtMD(days[0])) + '–' + escapeHtml(fmtMD(days[13])) + ' · 分项目堆叠（单位：天）</span></div>';
+    var head = '<div class="card-h"><h2>' + icon('check', 'ico-sm') + '近 14 天完成节点</h2>' +
+      '<span class="muted tiny">' + escapeHtml(fmtMD(start)) + '–' + escapeHtml(fmtMD(end)) + ' · 按负责人汇总</span></div>';
 
-    if (!maxTotal) {
-      box.innerHTML = head + '<div class="empty" style="padding:26px 16px">' +
-        '<b>还没有填写工时的记录</b>报工时填了「投入工时」，这里才会长出柱子。没填的记录不会被硬凑成柱子。</div>';
+    if (!done.length) {
+      box.innerHTML = head + '<div class="empty">' +
+        '<div class="e-ico">' + icon('check') + '</div>' +
+        '<b>近 14 天还没有完成的节点</b>在「今日」把节点一键标成完成，这里就会按负责人自动汇总出来。</div>';
       return;
     }
 
-    var W = 720, H = 216, padL = 36, padR = 8, padT = 12, padB = 28;
-    var plotW = W - padL - padR, plotH = H - padT - padB;
-    var slot = plotW / days.length;
-    var barW = slot * 0.56;
+    /* 每日完成节奏：14 根迷你柱，零增长的日子留灰底，缺口一眼可见 */
+    var dayCount = {};
+    days.forEach(function (d) { dayCount[d] = 0; });
+    done.forEach(function (n) { dayCount[n.doneDate]++; });
+    var maxDay = 0;
+    days.forEach(function (d) { if (dayCount[d] > maxDay) maxDay = dayCount[d]; });
 
-    /* 纵轴按 0.5 天台阶取刻度，保证每条线都是半天倍数 */
-    var maxDays = maxTotal / MIN_PER_DAY;
-    var stepDays = 0.5;
-    while (maxDays / stepDays > 5) stepDays = Math.round((stepDays + 0.5) * 2) / 2;
-    var gridCount = Math.max(1, Math.ceil(maxDays / stepDays));
-    var maxMin = gridCount * stepDays * MIN_PER_DAY;
-    if (maxMin <= 0) { maxMin = HALF_DAY; gridCount = 1; stepDays = 0.5; }
-
-    var parts = ['<svg class="chart-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="近 14 天投入工时堆叠柱状图">'];
-
-    /* 网格 */
-    for (var g = 0; g <= gridCount; g++) {
-      var y = padT + plotH - (plotH * g / gridCount);
-      parts.push('<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + y.toFixed(1) +
-        '" stroke="#eef1f8" stroke-width="1"/>');
-      parts.push('<text x="' + (padL - 7) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="9" fill="#9aa3b8">' +
-        (g * stepDays) + 'd</text>');
-    }
-
-    /* 柱子 */
-    days.forEach(function (d, idx) {
-      var x = padL + idx * slot + (slot - barW) / 2;
-      var accH = 0;
-      S.projects.forEach(function (p) {
-        var rec = (byPid[p.id] || {})[d];
-        var min = rec ? (rec.min || 0) : 0;
-        if (!min) return;   /* 未填工时：不占高度 */
-        var h = (min / maxMin) * plotH;
-        var y = padT + plotH - accH - h;
-        parts.push('<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + barW.toFixed(1) +
-          '" height="' + Math.max(1, h).toFixed(1) + '" rx="2.5" fill="' + escapeHtml(p.color || PALETTE[0]) + '">' +
-          '<title>' + escapeHtml(p.name + ' · ' + fmtMD(d) + ' · ' + fmtDays(min)) + '</title></rect>');
-        accH += h;
-      });
-
-      /* 当天合计标签只在最高那几根上标 */
-      if (totals[idx] > 0) {
-        var ty = padT + plotH - accH - 5;
-        parts.push('<text x="' + (x + barW / 2).toFixed(1) + '" y="' + ty.toFixed(1) + '" text-anchor="middle" font-size="9" fill="#6b7590">' +
-          (Math.round(totals[idx] / MIN_PER_DAY * 2) / 2) + '</text>');
-      }
-
-      parts.push('<text x="' + (x + barW / 2).toFixed(1) + '" y="' + (H - 9) + '" text-anchor="middle" font-size="9" fill="#9aa3b8">' +
-        Number(d.split('-')[2]) + '</text>');
-    });
-
-    parts.push('<line x1="' + padL + '" y1="' + (padT + plotH) + '" x2="' + (W - padR) + '" y2="' + (padT + plotH) + '" stroke="#dfe5f2" stroke-width="1"/>');
-    parts.push('</svg>');
-
-    var legend = '<div class="legend">' + S.projects.map(function (p) {
-      return '<span><i style="background:' + escapeHtml(p.color || PALETTE[0]) + '"></i>' + escapeHtml(p.name) + '</span>';
+    var flowHtml = '<div class="dn-flow">' + days.map(function (d) {
+      var c = dayCount[d];
+      var h = c ? Math.max(5, Math.round(c / maxDay * 40)) : 2;
+      return '<div class="dn-day' + (d === TODAY ? ' today' : '') + '" title="' +
+        escapeHtml(fmtMD(d) + ' · ' + c + ' 个节点') + '">' +
+        '<div class="dn-bar' + (c ? ' has' : ' zero') + '" style="height:' + h + 'px"></div>' +
+        '<span class="dn-dnum">' + Number(d.split('-')[2]) + '</span>' +
+        '</div>';
     }).join('') + '</div>';
 
-    box.innerHTML = head + '<div class="chart-box">' + parts.join('') + '</div>' + legend;
+    /* 摘要：总数 / 人数 / 按期拖期 */
+    var byOwner = {};
+    var onTime = 0, late = 0;
+    done.forEach(function (n) {
+      var key = n.owner || '未分配';
+      (byOwner[key] = byOwner[key] || []).push(n);
+      var t = nodeTiming(n);
+      if (t) { if (t.cls === 'late') late++; else onTime++; }
+    });
+
+    var sumHtml = '<div class="dn-sum">' +
+      '<span class="dn-chip brand">共 ' + done.length + ' 个节点</span>' +
+      '<span class="dn-chip">' + Object.keys(byOwner).length + ' 位负责人</span>' +
+      (onTime ? '<span class="dn-chip ok">按期 ' + onTime + '</span>' : '') +
+      (late ? '<span class="dn-chip bad">拖期 ' + late + '</span>' : '') +
+      '</div>';
+
+    /* 负责人分组：组间按完成数倒序，组内按完成日倒序 */
+    var groups = Object.keys(byOwner).map(function (k) {
+      return {
+        name: k,
+        list: byOwner[k].slice().sort(function (a, b) {
+          if (a.doneDate !== b.doneDate) return a.doneDate < b.doneDate ? 1 : -1;
+          return (b.seq || 0) - (a.seq || 0);
+        })
+      };
+    }).sort(function (a, b) {
+      if (b.list.length !== a.list.length) return b.list.length - a.list.length;
+      return a.name.localeCompare(b.name, 'zh');
+    });
+
+    var MAXROW = 6;
+    var groupsHtml = groups.map(function (g) {
+      var col = ownerColor(g.name);
+      var rows = g.list.slice(0, MAXROW).map(function (n) {
+        var p = projById[n.pid] || {};
+        var t = nodeTiming(n);
+        return '<div class="dn-row">' +
+          '<span class="dn-rdot" style="background:' + escapeHtml(p.color || PALETTE[0]) + '"></span>' +
+          '<div class="dn-rmain">' +
+            '<div class="dn-rname" title="' + escapeHtml(n.name) + '">' + escapeHtml(n.name) + '</div>' +
+            '<div class="dn-rsub">' + escapeHtml(p.name || '未知项目') + '</div>' +
+          '</div>' +
+          '<span class="dn-rdate">' + escapeHtml(fmtMD(n.doneDate)) + '</span>' +
+          (t ? '<span class="chip ' + t.cls + '">' + escapeHtml(t.txt) + '</span>' : '') +
+          '</div>';
+      }).join('');
+      var more = g.list.length > MAXROW
+        ? '<div class="dn-more">还有 ' + (g.list.length - MAXROW) + ' 个…</div>' : '';
+      return '<div class="dn-owner">' +
+        '<div class="dn-oh">' +
+          '<span class="dn-ava" style="background:' + col + '">' + escapeHtml(g.name.slice(0, 1)) + '</span>' +
+          '<div class="dn-oid">' +
+            '<div class="dn-oname">' + escapeHtml(g.name) + '</div>' +
+            '<div class="dn-ometa">最近完成 ' + escapeHtml(fmtMD(g.list[0].doneDate)) + '</div>' +
+          '</div>' +
+          '<span class="dn-ocount">' + g.list.length + ' 个</span>' +
+        '</div>' +
+        '<div class="dn-list">' + rows + more + '</div>' +
+        '</div>';
+    }).join('');
+
+    box.innerHTML = head +
+      '<div class="dn-top">' + sumHtml +
+        '<div class="dn-flowwrap"><span class="dn-flowt">每日完成</span>' + flowHtml + '</div>' +
+      '</div>' +
+      '<div class="dn-owners">' + groupsHtml + '</div>';
   }
 
   function renderBoard() {
@@ -2253,14 +2624,14 @@ svg{display:block;flex:none}
     if (!grid) return;
 
     if (!S.loaded) {
-      grid.innerHTML = '<div class="card chart-card"><div class="skel" style="height:200px"></div></div>' +
+      grid.innerHTML = '<div class="card dn-card"><div class="skel" style="height:220px"></div></div>' +
         '<div class="card"><div class="skel" style="height:220px"></div></div>';
       return;
     }
 
-    var html = ['<div class="card chart-card" id="chartCard"></div>'];
+    var html = ['<div class="card dn-card" id="doneCard"></div>'];
     grid.innerHTML = html.join('');
-    renderChart();
+    renderDoneNodes();
 
     if (!S.projects.length) {
       var empty = document.createElement('div');
@@ -2771,14 +3142,6 @@ svg{display:block;flex:none}
     var beforeRate = (S.metrics[p.id] || {}).rate || 0;
     setSync('busy');
 
-    var jobs = [];
-    /* ① 节点置完成 ② 同时记一条报工（备注写节点名，用于连续天数与工时统计） */
-    jobs.push(db.updateRecord({
-      databaseId: '1urnMOWB0VL3RL0pNiNILG',
-      recordId: nid,
-      properties: { '已完成': { checkbox: true }, '完成日': { date: TODAY } }
-    }));
-
     var lp = {
       '项目ID': { text: p.id },
       '项目名称': { text: p.name },
@@ -2787,9 +3150,32 @@ svg{display:block;flex:none}
       '备注': { text: n.name }
     };
     if (n.hours > 0) lp['工时分钟'] = { number: Math.round(n.hours * MIN_PER_DAY) };
-    jobs.push(db.addRecord({ databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', properties: lp }));
 
-    Promise.all(jobs).then(function () {
+    /* ① 节点置完成 ② 同时记一条报工（备注写节点名，用于连续天数与工时统计）
+       两步必须同生共死：以前并发发两个请求，服务端偶发只成功一半，
+       会留下"节点已完成但没报工"的脏状态（进度和统计对不上）。 */
+    var ops = [
+      {
+        op: 'update',
+        databaseId: TBL_NODE,
+        recordId: nid,
+        properties: { '已完成': { checkbox: true }, '完成日': { date: TODAY } }
+      },
+      { op: 'add', databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', properties: lp }
+    ];
+
+    var job = (typeof db.batch === 'function')
+      ? db.batch(ops)
+      : Promise.all([
+          db.updateRecord({
+            databaseId: TBL_NODE,
+            recordId: nid,
+            properties: { '已完成': { checkbox: true }, '完成日': { date: TODAY } }
+          }),
+          db.addRecord({ databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', properties: lp })
+        ]);
+
+    job.then(function () {
       toast('已完成「' + n.name + '」' + (n.hours > 0 ? ' · ' + fmtDays(n.hours * MIN_PER_DAY) : ''), 'ok');
       return reloadData();
     }).then(function () {
@@ -2799,7 +3185,7 @@ svg{display:block;flex:none}
         toast('「' + p.name + '」已 100% 关闭', 'ok');
       }
     }).catch(function (err) {
-      setSync('off', '完成节点失败：没有写入云端。');
+      setSync('off', '完成节点失败：数据没有完整写入，请重试。');
       toast('完成节点失败，请重试', 'err', function () { completeNode(nid); });
       if (window.console) console.error('[node] complete failed', err);
     });
@@ -2825,19 +3211,27 @@ svg{display:block;flex:none}
         if (!db) { toast('当前没有可用的数据存储', 'err'); return; }
         closeMask('maskConfirm');
         setSync('busy');
-        var jobs = related.map(function (l) {
-          return db.deleteRecord({ databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', recordId: l.id });
+        /* 删报工 + 改节点，同样要同生共死 */
+        var ops = related.map(function (l) {
+          return { op: 'delete', databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', recordId: l.id };
         });
-        jobs.push(db.updateRecord({
-          databaseId: '1urnMOWB0VL3RL0pNiNILG',
+        ops.push({
+          op: 'update',
+          databaseId: TBL_NODE,
           recordId: nid,
           properties: { '已完成': { checkbox: false } }
-        }));
-        Promise.all(jobs).then(function () {
+        });
+        var job = (typeof db.batch === 'function')
+          ? db.batch(ops)
+          : Promise.all(ops.map(function (op) {
+              if (op.op === 'delete') return db.deleteRecord({ databaseId: op.databaseId, recordId: op.recordId });
+              return db.updateRecord({ databaseId: op.databaseId, recordId: op.recordId, properties: op.properties });
+            }));
+        job.then(function () {
           toast('已撤销「' + n.name + '」', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '撤销失败：云端未确认。');
+          setSync('off', '撤销失败：数据没有完整写入，请重试。');
           toast('撤销失败，请重试', 'err', function () { undoNode(nid); });
           if (window.console) console.error('[node] undo failed', err);
         });
@@ -2859,7 +3253,7 @@ svg{display:block;flex:none}
           toast('节点已删除', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '删除失败：云端未确认。');
+          setSync('off', dst('删除失败：云端未确认。', '删除失败：数据没有完整写入。'));
           toast('删除失败，请重试', 'err', function () { deleteNode(nid); });
           if (window.console) console.error('[node] delete failed', err);
         });
@@ -2966,7 +3360,7 @@ svg{display:block;flex:none}
     }).then(function () {
       renderNodeList();
     }).catch(function (err) {
-      setSync('off', '添加节点失败：没有写入云端。');
+      setSync('off', dst('添加节点失败：没有写入云端。', '添加节点失败：没有写入本机数据库。'));
       toast('添加节点失败，请重试', 'err', addNode);
       if (window.console) console.error('[node] add failed', err);
     }).then(function () {
@@ -3164,6 +3558,7 @@ svg{display:block;flex:none}
     renderTodayHead();
     renderKpi();
     renderAttn();
+    renderProjFilter();
     renderProjects();
     renderSide();
     renderBoard();
@@ -3214,7 +3609,8 @@ svg{display:block;flex:none}
       if (nodePid) renderNodeList();
     }).catch(function (err) {
       S.loaded = true;
-      setSync('off', '读取失败：没能从云端取到数据，页面显示的是上一次成功加载的内容。');
+      setSync('off', dst('读取失败：没能从云端取到数据，页面显示的是上一次成功加载的内容。',
+           '读取失败：没能从本机数据库取到数据，页面显示的是上一次成功加载的内容。'));
       refreshAll();
       toast('数据读取失败，可重试', 'err', function () { reloadData(); });
       if (window.console) console.error('[data] load failed', err);
@@ -3302,7 +3698,7 @@ svg{display:block;flex:none}
           toast('示例数据已清空', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '清空失败：云端未确认。');
+          setSync('off', dst('清空失败：云端未确认。', '清空失败：数据没有完整写入。'));
           toast('清空失败，请重试', 'err', clearDemo);
           if (window.console) console.error('[demo] clear failed', err);
         });
@@ -3318,7 +3714,7 @@ svg{display:block;flex:none}
     var total = S.projects.length + S.logs.length + S.reviews.length;
     askConfirm('清空全部数据？',
       '将删除 <b>' + S.projects.length + '</b> 个项目、<b>' + S.logs.length + '</b> 条报工记录、<b>' + S.reviews.length +
-      '</b> 份周复盘，共 ' + total + ' 条。<br><br>云端数据一并清除，不可恢复。',
+      '</b> 份周复盘，共 ' + total + ' 条。<br><br>' + dst('云端数据一并清除，不可恢复。', '本机数据一并清除，不可恢复。'),
       '全部删除', function () {
         closeMask('maskConfirm');
         setSync('busy');
@@ -3333,7 +3729,7 @@ svg{display:block;flex:none}
           toast('全部数据已清空', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '清空失败：云端未确认，部分数据可能仍在。');
+          setSync('off', dst('清空失败：云端未确认，部分数据可能仍在。', '清空失败：数据没有完整写入，部分数据可能仍在。'));
           toast('清空失败，请重试', 'err', clearAll);
           if (window.console) console.error('[all] clear failed', err);
         });
@@ -3390,7 +3786,39 @@ svg{display:block;flex:none}
       else if (act === 'done-node') completeNode(el.getAttribute('data-nid'));
       else if (act === 'undo-node') undoNode(el.getAttribute('data-nid'));
       else if (act === 'del-node') deleteNode(el.getAttribute('data-nid'));
+      else if (act === 'clear-filter') resetProjFilter();
     });
+
+    /* 今日 · 项目快速筛选（阶段 / 状态 / 关键词） */
+    var pfBox = $('#projFilter');
+    if (pfBox) {
+      pfBox.addEventListener('click', function (e) {
+        var b = e.target;
+        while (b && b !== this && !(b.getAttribute && b.getAttribute('data-pf'))) b = b.parentNode;
+        if (!b || b === this) return;
+        var group = b.getAttribute('data-pf');
+        var v = b.getAttribute('data-v');
+        S.projFilter[group] = (S.projFilter[group] === v) ? '' : v;   /* 再点一次 = 取消该维度 */
+        renderProjFilter();
+        renderProjects();
+      });
+    }
+    var pfQEl = $('#pfQ');
+    if (pfQEl) pfQEl.addEventListener('input', function () {
+      S.projFilter.q = this.value.trim();
+      syncPfSearchUi();
+      renderProjects();
+    });
+    var pfQClear = $('#pfQClear');
+    if (pfQClear) pfQClear.addEventListener('click', function () {
+      var q = $('#pfQ');
+      if (q) { q.value = ''; try { q.focus(); } catch (e3) {} }
+      S.projFilter.q = '';
+      syncPfSearchUi();
+      renderProjects();
+    });
+    var pfReset = $('#pfReset');
+    if (pfReset) pfReset.addEventListener('click', resetProjFilter);
 
     /* 新建入口 */
     $('#btnNewTop').addEventListener('click', function () { openProjectModal(null); });
@@ -3510,7 +3938,7 @@ svg{display:block;flex:none}
     $('#btnResync').addEventListener('click', function () {
       toast('正在重新同步…');
       reloadData().then(function () {
-        if (S.syncState === 'ok') toast('已与云端同步', 'ok');
+        if (S.syncState === 'ok') toast(dst('已与云端同步', '已保存到本机数据库'), 'ok');
       });
     });
     $('#btnExport').addEventListener('click', exportJson);
@@ -3550,6 +3978,9 @@ svg{display:block;flex:none}
     loadSchemaOnce();
     subscribeUpdates();
     reloadData();
+    /* 本地版的离线条默认文案也换掉（HTML 里写死了"云端"） */
+    var ot = $('#offlineTxt');
+    if (ot && LOCAL) ot.textContent = '离线模式：没能连上本机数据库，改动暂不会保存。';
   }
 
   if (document.readyState === 'loading') {

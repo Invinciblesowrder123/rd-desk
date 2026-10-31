@@ -6,7 +6,7 @@
     var sub = $('#todaySub');
     if (!sub) return;
     if (!S.loaded) {
-      sub.innerHTML = icon('clock', 'ico-sm') + '<span>正在读取云端数据…</span>';
+      sub.innerHTML = icon('clock', 'ico-sm') + '<span>' + dst('正在读取云端数据…', '正在读取本机数据…') + '</span>';
       return;
     }
     var n = S.projects.length;
@@ -46,6 +46,117 @@
     }).join('');
   }
 
+  /* ============================================================
+     项目快速筛选（只作用于「可直接报工」列表）
+     口径与 attentionList / sortedProjects 对齐：逾期 > 昨日缺报 > 正常
+     ============================================================ */
+  /* 阶段候选项：优先云端 schema 回填，与新建项目弹窗一致 */
+  function stageList() {
+    var opts = (window.__SCHEMA_OPTIONS && window.__SCHEMA_OPTIONS['阶段']) || null;
+    return opts && opts.length ? opts.map(function (o) { return o.text; }) : STAGES;
+  }
+
+  function statusOf(p) {
+    var m = S.metrics[p.id] || {};
+    if (m.overdue > 0) return 'overdue';
+    if (m.yStatus === 'broken' || m.yStatus === 'buffer') return 'miss';
+    return 'ok';
+  }
+
+  function pfCounts() {
+    var byStage = {}, byStatus = { overdue: 0, miss: 0, ok: 0 };
+    S.projects.forEach(function (p) {
+      var st = p.stage || '设计';
+      byStage[st] = (byStage[st] || 0) + 1;
+      byStatus[statusOf(p)]++;
+    });
+    return { stage: byStage, status: byStatus, total: S.projects.length };
+  }
+
+  function filteredProjects() {
+    var f = S.projFilter;
+    var q = (f.q || '').toLowerCase();
+    return sortedProjects().filter(function (p) {
+      if (f.stage && (p.stage || '设计') !== f.stage) return false;
+      if (f.status && statusOf(p) !== f.status) return false;
+      if (q && String(p.name).toLowerCase().indexOf(q) === -1) return false;
+      return true;
+    });
+  }
+
+  function pfActive() {
+    var f = S.projFilter;
+    return !!(f.stage || f.status || f.q);
+  }
+
+  function syncPfSearchUi() {
+    var wrap = $('#pfSearch'), q = $('#pfQ');
+    if (wrap && q) wrap.classList.toggle('has-q', !!q.value);
+  }
+
+  function updatePfCount() {
+    var el = $('#pfCount');
+    if (!el) return;
+    var total = S.projects.length;
+    el.textContent = pfActive()
+      ? ('显示 ' + filteredProjects().length + ' / ' + total + ' 个')
+      : ('共 ' + total + ' 个项目');
+  }
+
+  function pfChip(group, value, label, n, on) {
+    return '<button type="button" class="pf-chip' + (on ? ' on' : '') + '" data-pf="' + group +
+      '" data-v="' + escapeHtml(value) + '">' + escapeHtml(label) +
+      (n == null ? '' : '<em>' + n + '</em>') + '</button>';
+  }
+
+  /* 只重绘两个 chips 行；搜索框是静态 HTML，重绘会丢焦点和事件 */
+  function renderProjFilter() {
+    var box = $('#projFilter');
+    if (!box) return;
+    if (!S.loaded) { box.classList.add('hide'); return; }
+    box.classList.remove('hide');
+
+    var c = pfCounts(), f = S.projFilter;
+
+    var stageRow = $('#pfStageRow');
+    if (stageRow) {
+      var sHtml = '<span class="pf-lbl">阶段</span>' + pfChip('stage', '', '全部', c.total, !f.stage);
+      stageList().forEach(function (st) {
+        sHtml += pfChip('stage', st, st, c.stage[st] || 0, f.stage === st);
+      });
+      stageRow.innerHTML = sHtml;
+    }
+
+    var statusRow = $('#pfStatusRow');
+    if (statusRow) {
+      var rows = [
+        ['', '全部', c.total],
+        ['overdue', '逾期', c.status.overdue],
+        ['miss', '昨日缺报', c.status.miss],
+        ['ok', '节奏正常', c.status.ok]
+      ];
+      var tHtml = '<span class="pf-lbl">状态</span>';
+      rows.forEach(function (r) {
+        tHtml += pfChip('status', r[0], r[1], r[2], f.status === r[0]);
+      });
+      statusRow.innerHTML = tHtml;
+    }
+
+    box.classList.toggle('filtering', pfActive());
+    updatePfCount();
+  }
+
+  function resetProjFilter() {
+    S.projFilter.stage = '';
+    S.projFilter.status = '';
+    S.projFilter.q = '';
+    var q = $('#pfQ');
+    if (q) q.value = '';
+    syncPfSearchUi();
+    renderProjFilter();
+    renderProjects();
+  }
+
   /* 今天要处理 */
   function renderAttn() {
     var box = $('#attnWrap');
@@ -58,7 +169,7 @@
 
     var html = ['<div class="attn-head"><h2>' + icon('alert', 'ico-sm') +
       '今天要处理<span class="chip" style="background:var(--red-soft);color:#be123c">' + list.length + '</span></h2>' +
-      '<span class="muted tiny">逾期与缺报会自动滚入今天</span></div><div class="attn-list">'];
+      '<span class="muted tiny">只列当天及更早还有未报工节点的项目</span></div><div class="attn-list">'];
 
     list.forEach(function (it) {
       var p = it.p, m = it.m;
@@ -84,7 +195,7 @@
             '<div class="a-ico">' + icon('clock') + '</div>' +
             '<div class="a-body">' +
               '<div class="a-title">' + escapeHtml(p.name) + '<span class="chip late">连续缺报</span></div>' +
-              '<div class="a-desc">昨日（' + escapeHtml(fmtMD(addDays(TODAY, -1))) + '）未报工，本周缓冲日已用完，连续记录断在此处。现在补记还能救回来。</div>' +
+              '<div class="a-desc">昨日（' + escapeHtml(fmtMD(addDays(TODAY, -1))) + '）未报工，本周缓冲日已用完，连续记录断在此处。还有 ' + m.dueNodes + ' 个节点计划已到还没关，今天推进一下再补记。</div>' +
             '</div>' +
             '<div class="a-actions">' +
               '<button class="btn btn-sm btn-primary" data-act="report" data-pid="' + escapeHtml(p.id) + '">立即报工</button>' +
@@ -97,7 +208,7 @@
             '<div class="a-ico">' + icon('shield') + '</div>' +
             '<div class="a-body">' +
               '<div class="a-title">' + escapeHtml(p.name) + '<span class="chip buf">缓冲日</span></div>' +
-              '<div class="a-desc">昨日未报工，已自动用掉本周 1 个缓冲日，连续 ' + m.streak + ' 天保留未断。今天补上，节奏就还在。</div>' +
+              '<div class="a-desc">昨日未报工，已自动用掉本周 1 个缓冲日，连续 ' + m.streak + ' 天保留未断。有 ' + m.dueNodes + ' 个节点计划已到，今天补上，节奏就还在。</div>' +
             '</div>' +
             '<div class="a-actions">' +
               '<button class="btn btn-sm btn-primary" data-act="report" data-pid="' + escapeHtml(p.id) + '">立即报工</button>' +
@@ -134,8 +245,20 @@
       return;
     }
 
+    var list = filteredProjects();
+    if (!list.length) {
+      /* 有项目但被筛空了：给一条明确的退路，而不是空白 */
+      box.innerHTML = '<div class="empty"><div class="e-ico">' + icon('search') + '</div>' +
+        '<b>没有符合筛选条件的项目</b>换个关键词或阶段试试，也可以直接看全部 ' + S.projects.length + ' 个项目。' +
+        '<div style="margin-top:12px"><button class="btn btn-sm" data-act="clear-filter">重置筛选</button></div></div>';
+      var hint0 = $('#listHint');
+      if (hint0) hint0.textContent = '筛选中 · 0 / ' + S.projects.length + ' 个项目';
+      updatePfCount();
+      return;
+    }
+
     var html = [];
-    sortedProjects().forEach(function (p) {
+    list.forEach(function (p) {
       var m = S.metrics[p.id] || {};
       var color = p.color || PALETTE[0];
       var stageCls = 'stage-' + (p.stage || '设计');
@@ -233,7 +356,12 @@
     box.innerHTML = html.join('');
 
     var hint = $('#listHint');
-    if (hint) hint.textContent = '点「完成节点」即记一次报工 · ' + S.projects.length + ' 个项目';
+    if (hint) {
+      hint.textContent = pfActive()
+        ? '筛选中 · ' + list.length + ' / ' + S.projects.length + ' 个项目'
+        : '点「完成节点」即记一次报工 · ' + S.projects.length + ' 个项目';
+    }
+    updatePfCount();
   }
 
   /* 右侧风险栏 */
@@ -346,7 +474,7 @@
     };
 
     var db = sdk();
-    if (!db) { toast('当前未连接云端，改动无法保存', 'err', function () { saveProject(); }); return; }
+    if (!db) { toast(dst('当前未连接云端，改动无法保存', '当前没有可用的数据存储，改动无法保存'), 'err', function () { saveProject(); }); return; }
 
     var btn = $('#projSave');
     btn.disabled = true;
@@ -363,8 +491,9 @@
       closeMask('maskProj');
       return reloadData();
     }).catch(function (err) {
-      setSync('off', '写入失败：改动没有保存到云端，请检查网络后重试。');
-      toast('保存失败，数据未写入云端', 'err', function () { saveProject(); });
+      setSync('off', dst('写入失败：改动没有保存到云端，请检查网络后重试。',
+        '写入失败：改动没有保存到本机数据库，请重试。'));
+      toast(dst('保存失败，数据未写入云端', '保存失败，数据未写入本机数据库'), 'err', function () { saveProject(); });
       if (window.console) console.error('[project] save failed', err);
     }).then(function () {
       btn.disabled = false;
@@ -379,10 +508,10 @@
     var mine = S.logs.filter(function (l) { return l.pid === id; });
 
     askConfirm('删除项目？',
-      '将删除 <b>' + escapeHtml(p.name) + '</b> 及其 ' + mine.length + ' 条报工记录。<br><br>这个动作不可恢复，云端数据会一并清除。',
+      '将删除 <b>' + escapeHtml(p.name) + '</b> 及其 ' + mine.length + ' 条报工记录。<br><br>这个动作不可恢复，' + dst('云端数据会一并清除。', '本机数据会一并清除。'),
       '确认删除', function () {
         var db = sdk();
-        if (!db) { toast('当前未连接云端', 'err'); return; }
+        if (!db) { toast(dst('当前未连接云端', '当前没有可用的数据存储'), 'err'); return; }
         closeMask('maskConfirm');
         setSync('busy');
         var jobs = mine.map(function (l) {
@@ -394,7 +523,7 @@
           toast('项目已删除', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '删除失败：云端未确认，数据可能仍在。');
+          setSync('off', dst('删除失败：云端未确认，数据可能仍在。', '删除失败：数据没有完整写入，可能仍在。'));
           toast('删除失败，请重试', 'err', function () { deleteProject(id); });
           if (window.console) console.error('[project] delete failed', err);
         });
@@ -404,14 +533,14 @@
   function deleteLog(id) {
     askConfirm('删除这条报工记录？', '删除后该日的推进量与工时都会从统计中移除，不可恢复。', '确认删除', function () {
       var db = sdk();
-      if (!db) { toast('当前未连接云端', 'err'); return; }
+      if (!db) { toast(dst('当前未连接云端', '当前没有可用的数据存储'), 'err'); return; }
       closeMask('maskConfirm');
       setSync('busy');
       db.deleteRecord({ databaseId: 'bI9MkKD1Zvp1UwmmY6UvfX', recordId: id }).then(function () {
         toast('记录已删除', 'ok');
         return reloadData();
       }).catch(function (err) {
-        setSync('off', '删除失败：云端未确认。');
+        setSync('off', dst('删除失败：云端未确认。', '删除失败：数据没有完整写入。'));
         toast('删除失败，请重试', 'err', function () { deleteLog(id); });
         if (window.console) console.error('[log] delete failed', err);
       });
@@ -479,7 +608,7 @@
     if (workMin > 0) props['工时分钟'] = { number: workMin };
 
     var db = sdk();
-    if (!db) { toast('当前未连接云端，报工无法保存', 'err', function () { saveReport(); }); return; }
+    if (!db) { toast(dst('当前未连接云端，报工无法保存', '当前没有可用的数据存储，报工无法保存'), 'err', function () { saveReport(); }); return; }
 
     var btn = $('#repSave');
     btn.disabled = true;
@@ -500,7 +629,7 @@
         toast('「' + p.name + '」已 100% 关闭', 'ok');
       }
     }).catch(function (err) {
-      setSync('off', '报工失败：这条记录没有写入云端。');
+      setSync('off', dst('报工失败：这条记录没有写入云端。', '报工失败：这条记录没有写入本机数据库。'));
       toast('报工失败，数据未保存', 'err', function () { saveReport(); });
       if (window.console) console.error('[report] save failed', err);
     }).then(function () {

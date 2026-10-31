@@ -179,6 +179,7 @@
     renderTodayHead();
     renderKpi();
     renderAttn();
+    renderProjFilter();
     renderProjects();
     renderSide();
     renderBoard();
@@ -229,7 +230,8 @@
       if (nodePid) renderNodeList();
     }).catch(function (err) {
       S.loaded = true;
-      setSync('off', '读取失败：没能从云端取到数据，页面显示的是上一次成功加载的内容。');
+      setSync('off', dst('读取失败：没能从云端取到数据，页面显示的是上一次成功加载的内容。',
+           '读取失败：没能从本机数据库取到数据，页面显示的是上一次成功加载的内容。'));
       refreshAll();
       toast('数据读取失败，可重试', 'err', function () { reloadData(); });
       if (window.console) console.error('[data] load failed', err);
@@ -317,7 +319,7 @@
           toast('示例数据已清空', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '清空失败：云端未确认。');
+          setSync('off', dst('清空失败：云端未确认。', '清空失败：数据没有完整写入。'));
           toast('清空失败，请重试', 'err', clearDemo);
           if (window.console) console.error('[demo] clear failed', err);
         });
@@ -333,7 +335,7 @@
     var total = S.projects.length + S.logs.length + S.reviews.length;
     askConfirm('清空全部数据？',
       '将删除 <b>' + S.projects.length + '</b> 个项目、<b>' + S.logs.length + '</b> 条报工记录、<b>' + S.reviews.length +
-      '</b> 份周复盘，共 ' + total + ' 条。<br><br>云端数据一并清除，不可恢复。',
+      '</b> 份周复盘，共 ' + total + ' 条。<br><br>' + dst('云端数据一并清除，不可恢复。', '本机数据一并清除，不可恢复。'),
       '全部删除', function () {
         closeMask('maskConfirm');
         setSync('busy');
@@ -348,7 +350,7 @@
           toast('全部数据已清空', 'ok');
           return reloadData();
         }).catch(function (err) {
-          setSync('off', '清空失败：云端未确认，部分数据可能仍在。');
+          setSync('off', dst('清空失败：云端未确认，部分数据可能仍在。', '清空失败：数据没有完整写入，部分数据可能仍在。'));
           toast('清空失败，请重试', 'err', clearAll);
           if (window.console) console.error('[all] clear failed', err);
         });
@@ -405,7 +407,39 @@
       else if (act === 'done-node') completeNode(el.getAttribute('data-nid'));
       else if (act === 'undo-node') undoNode(el.getAttribute('data-nid'));
       else if (act === 'del-node') deleteNode(el.getAttribute('data-nid'));
+      else if (act === 'clear-filter') resetProjFilter();
     });
+
+    /* 今日 · 项目快速筛选（阶段 / 状态 / 关键词） */
+    var pfBox = $('#projFilter');
+    if (pfBox) {
+      pfBox.addEventListener('click', function (e) {
+        var b = e.target;
+        while (b && b !== this && !(b.getAttribute && b.getAttribute('data-pf'))) b = b.parentNode;
+        if (!b || b === this) return;
+        var group = b.getAttribute('data-pf');
+        var v = b.getAttribute('data-v');
+        S.projFilter[group] = (S.projFilter[group] === v) ? '' : v;   /* 再点一次 = 取消该维度 */
+        renderProjFilter();
+        renderProjects();
+      });
+    }
+    var pfQEl = $('#pfQ');
+    if (pfQEl) pfQEl.addEventListener('input', function () {
+      S.projFilter.q = this.value.trim();
+      syncPfSearchUi();
+      renderProjects();
+    });
+    var pfQClear = $('#pfQClear');
+    if (pfQClear) pfQClear.addEventListener('click', function () {
+      var q = $('#pfQ');
+      if (q) { q.value = ''; try { q.focus(); } catch (e3) {} }
+      S.projFilter.q = '';
+      syncPfSearchUi();
+      renderProjects();
+    });
+    var pfReset = $('#pfReset');
+    if (pfReset) pfReset.addEventListener('click', resetProjFilter);
 
     /* 新建入口 */
     $('#btnNewTop').addEventListener('click', function () { openProjectModal(null); });
@@ -525,7 +559,7 @@
     $('#btnResync').addEventListener('click', function () {
       toast('正在重新同步…');
       reloadData().then(function () {
-        if (S.syncState === 'ok') toast('已与云端同步', 'ok');
+        if (S.syncState === 'ok') toast(dst('已与云端同步', '已保存到本机数据库'), 'ok');
       });
     });
     $('#btnExport').addEventListener('click', exportJson);
@@ -565,6 +599,9 @@
     loadSchemaOnce();
     subscribeUpdates();
     reloadData();
+    /* 本地版的离线条默认文案也换掉（HTML 里写死了"云端"） */
+    var ot = $('#offlineTxt');
+    if (ot && LOCAL) ot.textContent = '离线模式：没能连上本机数据库，改动暂不会保存。';
   }
 
   if (document.readyState === 'loading') {

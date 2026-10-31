@@ -226,6 +226,54 @@
       return Promise.resolve({});
     },
 
+    /* 原子批量写：本地存储是单线程 JS，本身就是原子的；
+       顺序执行并在任一步失败时抛错，语义与服务端一致。 */
+    batch: function (ops) {
+      var store = load();
+      var results = [];
+      var touched = {};
+      try {
+        for (var i = 0; i < (ops || []).length; i++) {
+          var op = ops[i];
+          var id = op.databaseId;
+          if (!store[id]) store[id] = [];
+          touched[id] = true;
+          if (op.op === 'add') {
+            var row = { _id: uid('r') };
+            var props = op.properties || {};
+            Object.keys(props).forEach(function (k) { row[k] = unwrap(props[k]); });
+            store[id].push(row);
+            results.push({ id: row._id });
+          } else if (op.op === 'update') {
+            var rows = store[id];
+            var hit = null;
+            for (var j = 0; j < rows.length; j++) {
+              if (rows[j]._id === op.recordId) { hit = rows[j]; break; }
+            }
+            if (!hit) throw new Error('RECORD_NOT_FOUND');
+            var p2 = op.properties || {};
+            Object.keys(p2).forEach(function (k) { hit[k] = unwrap(p2[k]); });
+            results.push({ id: op.recordId });
+          } else if (op.op === 'delete') {
+            var kept = [];
+            for (var m = 0; m < store[id].length; m++) {
+              if (store[id][m]._id !== op.recordId) kept.push(store[id][m]);
+            }
+            store[id] = kept;
+            results.push({ ok: true });
+          } else {
+            throw new Error('unknown op: ' + op.op);
+          }
+        }
+      } catch (e) {
+        /* 出错：整体不落盘，保持"全成或全不成" */
+        return Promise.reject(e);
+      }
+      save(store);
+      Object.keys(touched).forEach(function (k) { notify(k); });
+      return Promise.resolve({ results: results });
+    },
+
     getSchema: function (params) {
       return Promise.resolve(SCHEMAS[params.databaseId] || { properties: [] });
     },

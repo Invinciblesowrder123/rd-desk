@@ -36,6 +36,8 @@
     syncState: 'ok',
     editingId: null,
     reportPid: null,
+    /* 今日页项目快速筛选（阶段 / 状态 / 关键词），刷新数据不清空 */
+    projFilter: { stage: '', status: '', q: '' },
     confetti: {},
     selColor: PALETTE[0],
     kptWeek: '',
@@ -262,6 +264,13 @@
   }
 
   /* ---------------- 同步状态 ---------------- */
+
+  /* 本地版没有"云端"，文案要跟着变，否则用户看到"没写入云端"会以为要去连网。
+     用法：dst(cloudText, localText) */
+  function dst(cloudText, localText) {
+    return LOCAL ? localText : cloudText;
+  }
+
   function setSync(state, msg) {
     S.syncState = state;
     if (state === 'ok') S.lastSync = new Date();
@@ -308,28 +317,66 @@
   }
 
   /* ---------------- 提示 ---------------- */
-  function toast(msg, kind, retry) {
+  /* 每条 toast 都自带关闭按钮，并且都会自动消失：
+     错误类停留久一点（12s，给用户看清并按"重试"），普通 3.4s。
+     鼠标悬停时暂停倒计时，方便用户去点重试按钮。 */
+  var TOAST_TTL = { ok: 3400, info: 3400, err: 12000 };
+
+  function toast(msg, kind, retry, retryText) {
     var wrap = $('#toastWrap');
     if (!wrap) return;
     var t = document.createElement('div');
     t.className = 'toast ' + (kind || '');
     var icoName = kind === 'ok' ? 'check' : (kind === 'err' ? 'alert' : 'info');
     t.innerHTML = icon(icoName, 'ico-sm') + '<span class="t-msg">' + escapeHtml(msg) + '</span>';
+
+    var timer = null;
+    var left = TOAST_TTL[kind || 'info'] || 3400;
+
+    function dismiss() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (t.parentNode) t.parentNode.removeChild(t);
+    }
+
+    function start() {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(dismiss, left);
+    }
+
+    function pause() {
+      if (timer) { clearTimeout(timer); timer = null; }
+    }
+
     if (typeof retry === 'function') {
       var b = document.createElement('button');
-      b.textContent = '重试';
+      b.className = 't-retry';
+      b.textContent = retryText || '重试';
       b.onclick = function () {
-        if (t.parentNode) t.parentNode.removeChild(t);
+        dismiss();
         retry();
       };
       t.appendChild(b);
-    } else {
-      setTimeout(function () {
-        if (t.parentNode) t.parentNode.removeChild(t);
-      }, 3400);
     }
+
+    /* 关闭按钮：任何一条 toast 都能手动关掉 */
+    var x = document.createElement('button');
+    x.className = 't-close';
+    x.setAttribute('aria-label', '关闭提示');
+    x.innerHTML = icon('close', 'ico-sm');
+    x.onclick = function () { dismiss(); };
+    t.appendChild(x);
+
+    t.addEventListener('mouseenter', pause);
+    t.addEventListener('mouseleave', start);
+
     wrap.appendChild(t);
+    start();
+    return { dismiss: dismiss };
   }
+
+  /* 适配层（08_remotedb.js）在独立作用域里，靠这个拿到提示能力：
+     例如"页面有新版本，请刷新"这类由轮询触发的提示 */
+  window.__toast = toast;
 
   /* ---------------- 弹窗 ---------------- */
   function openMask(id) {
@@ -386,6 +433,16 @@
     var remainNodes = Math.max(0, nodeTotal - nodeDone);
     var rate = nodeTotal > 0 ? nodeDone / nodeTotal : 0;
     var dLeft = p.due ? dayDiff(TODAY, p.due) : 0;
+
+    /* 到期未完成节点：计划完成日已经到了（或更早）却还没关掉的节点。
+       研发项目不是每天都有阶段性进展——缺报提醒只对"确实有事欠着"的
+       项目出；节点全排在未来的项目不该被催（2026-10-30 用户提出）。
+       注意 dayDiff(a, b) 的语义是 b - a，所以"planDate ≤ 今天"要写 >= 0。 */
+    var dueNodes = 0;
+    nodes.forEach(function (n) {
+      if (n.done) return;
+      if (n.planDate && dayDiff(n.planDate, TODAY) >= 0) dueNodes++;
+    });
 
     /* 投入工时仍来自报工记录（工时是投入，与节点进度分开看） */
     var dates = Object.keys(byDate || {});
@@ -448,6 +505,7 @@
       etaNote: etaNote,
       todayNodes: todayNodes,
       todayMin: todayMin,
+      dueNodes: dueNodes,
       overdue: (dLeft < 0 && remainNodes > 0) ? -dLeft : 0,
       logDays: dates.length,
       minSum: minSum,
@@ -464,7 +522,9 @@
     return byPid;
   }
 
-  /* 每个项目只出一条待处理，优先级：逾期 > 连续缺报 > 缓冲日 */
+  /* 每个项目只出一条待处理，优先级：逾期 > 连续缺报 > 缓冲日。
+     缺报两类只对"当天或更早还有没报工的节点"的项目出（dueNodes > 0）：
+     研发不是每天都有进展，节点全排在未来的项目别去催它。 */
   function attentionList() {
     var out = [];
     S.projects.forEach(function (p) {
@@ -472,8 +532,8 @@
       if (!m) return;
       var kind = null;
       if (m.overdue > 0) kind = 'overdue';
-      else if (m.yStatus === 'broken') kind = 'broken';
-      else if (m.yStatus === 'buffer') kind = 'buffer';
+      else if (m.dueNodes > 0 && m.yStatus === 'broken') kind = 'broken';
+      else if (m.dueNodes > 0 && m.yStatus === 'buffer') kind = 'buffer';
       if (!kind) return;
       out.push({ kind: kind, p: p, m: m, w: kind === 'overdue' ? 1 : (kind === 'broken' ? 2 : 3) });
     });

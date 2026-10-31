@@ -26,6 +26,7 @@
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11M7.5 10.5 12 15l4.5-4.5M4.5 19.5h15"/></symbol>
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5v-11M7.5 8.5 12 4l4.5 4.5M4.5 19.5h15"/></symbol>
   <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4.5h11l3.5 3.5v11.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1z"/><path d="M8 4.5v5h7v-5M8 20.5V14h8v6.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></symbol>
 </svg>
 
 <div class="shell">
@@ -94,6 +95,18 @@
               <h2><svg class="ico ico-sm"><use href="#i-bolt"/></svg>可直接报工</h2>
               <span class="muted tiny" id="listHint">按建议量预填，可改</span>
             </div>
+            <!-- 项目快速筛选：阶段 / 状态 / 关键词，只作用于下方列表 -->
+            <div class="proj-filter" id="projFilter">
+              <div class="pf-search" id="pfSearch">
+                <svg class="ico ico-sm"><use href="#i-search"/></svg>
+                <input id="pfQ" type="text" placeholder="搜项目名 / 客户，如：冰淇淋" autocomplete="off">
+                <button class="pf-clear" id="pfQClear" type="button" aria-label="清空搜索"><svg class="ico ico-sm"><use href="#i-close"/></svg></button>
+                <span class="pf-count" id="pfCount"></span>
+                <button class="pf-reset" id="pfReset" type="button">重置</button>
+              </div>
+              <div class="pf-row" id="pfStageRow"><span class="pf-lbl">阶段</span></div>
+              <div class="pf-row" id="pfStatusRow"><span class="pf-lbl">状态</span></div>
+            </div>
             <div id="projList"></div>
             <button class="new-entry" id="btnNewBottom">
               <svg class="ico"><use href="#i-plus"/></svg>新建一个研发项目
@@ -109,7 +122,7 @@
         <div class="page-head">
           <div>
             <h1>项目看板</h1>
-            <div class="sub"><svg class="ico ico-sm"><use href="#i-layers"/></svg><span>进度环 · 核心数字 · 报工记录 · 14 天工时</span></div>
+            <div class="sub"><svg class="ico ico-sm"><use href="#i-layers"/></svg><span>进度环 · 核心数字 · 报工记录 · 14 天完成节点</span></div>
           </div>
         </div>
         <div class="board-grid" id="boardGrid"></div>

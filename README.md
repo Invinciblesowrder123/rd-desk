@@ -115,7 +115,8 @@ python local/server.py 8787
 ```
 
 - **页面不是单机 HTML**：数据在服务端 SQLite，所以多开几个标签页看到的是同一份，
-  改完 3 秒内其他页面自动刷新（靠 `/api/rev` 版本号轮询）。
+  改完 3 秒内其他页面自动刷新（靠 `/api/rev` 版本号轮询）。`/api/rev` 同时返回
+  `index.html` 的构建戳，页面发现前端换过版本会提示刷新——不刷就一直跑旧 JS。
 - **记录整行存 JSON**：加字段不用改表结构；需要写 SQL 的地方用 `v_projects` / `v_nodes`
   等视图（见数据模型文档）。
 - **前端零框架**：一段原生 JS，构建脚本把 6 个源文件拼成一个 HTML，没有 npm、没有打包器。
@@ -126,7 +127,7 @@ python local/server.py 8787
 
 ```
 local/            运行时代码：server.py（HTTP+API）、deskdb.py（存储）、index.html（构建产物）
-src/              页面源码：build/ 下 8 个片段 + build.py 拼接
+src/              页面源码：build/ 下 10 个片段 + build.py 拼接
 src/out/          构建中间产物（不入库）
 data/             种子数据（seed.demo.json 演示用；seed.json 真实数据，不入库）
 bridge/           运行时数据库（不入库）
@@ -150,6 +151,13 @@ python src/build.py
 ```
 
 `local/index.html` 已随仓库提供，只是想跑起来不必构建。
+
+**改完前端必须让页面硬刷（Ctrl+F5）。** 页面 JS 只在打开时加载一次，重启服务、
+重新构建都不会替换它，表现为"改了没反应"或"还在报旧错"。`/api/rev` 里的构建戳
+就是为这个准备的：mtime 变了，页面会自己弹提示。
+
+`legacy.html` 会把数据内联进 HTML，所以只从 `data/seed.demo.json`（脱敏演示数据）
+取数，真实 `data/seed.json` 永远不会进包。
 
 ---
 

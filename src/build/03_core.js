@@ -1,11 +1,11 @@
 /* ============================================================
    家电研发推进中台 · 数据层与算法层
-   数据真实存放于资料库三张数据表，页面读写直连云端
+   数据真身在本机 bridge/desk.db，页面经 /api 读写
    ============================================================ */
 (function () {
   'use strict';
 
-  /* 三张资料库数据表（databaseId 硬编码在调用处，页面直连云端读写） */
+  /* 四张逻辑表（databaseId 硬编码在调用处，页面经 /api 读写） */
   var TBL_PROJECT = 'XurtLd3EYpe29VppV0z0TJ';   /* 研发项目 */
   var TBL_LOG     = 'bI9MkKD1Zvp1UwmmY6UvfX';   /* 每日报工 */
   var TBL_WEEK    = 'nG1nopjeQW93K0wclTs4jR';   /* 每周复盘 */
@@ -222,7 +222,12 @@
       planDate: normDate(row['计划完成日']),
       done: !!row['已完成'],
       doneDate: normDate(row['完成日']),
-      note: row['备注'] || ''
+      note: row['备注'] || '',
+      /* 延期登记：改计划日往后推时写入 */
+      origPlanDate: normDate(row['原计划日']),
+      delayDate: normDate(row['延期日']),
+      delayReason: row['延期理由'] || '',
+      delayCount: num(row['延期次数'], 0)
     };
   }
 
@@ -268,7 +273,12 @@
   /* 本地版没有"云端"，文案要跟着变，否则用户看到"没写入云端"会以为要去连网。
      用法：dst(cloudText, localText) */
   function dst(cloudText, localText) {
-    return LOCAL ? localText : cloudText;
+    if (!LOCAL) return cloudText;
+    /* legacy 是 localStorage 版，toast 里说「本机数据库」不准确；
+       两个产物都注入 LOCAL=true，用 __REMOTE_STORE__ 区分真源类型。 */
+    var isL2 = false;
+    try { isL2 = !!(window && window.__REMOTE_STORE__); } catch (e) { isL2 = false; }
+    return isL2 ? localText : String(localText).replace(/本机数据库/g, '本地存储');
   }
 
   function setSync(state, msg) {
@@ -562,7 +572,7 @@
   function weekStats(range) {
     var rows = {};
     S.projects.forEach(function (p) {
-      rows[p.id] = { pid: p.id, name: p.name, color: p.color, nodes: 0, min: 0, days: {}, cnt: 0 };
+      rows[p.id] = { pid: p.id, name: p.name, color: p.color, nodes: 0, min: 0, days: {}, cnt: 0, delays: [] };
     });
     /* 完成的节点按「完成日」计入所在周 */
     S.nodes.forEach(function (n) {
@@ -570,6 +580,13 @@
       if (n.doneDate < range.start || n.doneDate > range.end) return;
       var r = rows[n.pid];
       if (r) r.nodes++;
+    });
+    /* 本周登记的延期（节点已完不完成都算，延期这件事本身就发生在这一周） */
+    S.nodes.forEach(function (n) {
+      if (!n.delayDate) return;
+      if (n.delayDate < range.start || n.delayDate > range.end) return;
+      var r = rows[n.pid];
+      if (r) r.delays.push(n);
     });
     S.logs.forEach(function (l) {
       if (l.date < range.start || l.date > range.end) return;

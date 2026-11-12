@@ -39,16 +39,23 @@
       if (!S.projects.length) {
         box.innerHTML = '<div class="empty"><b>没有项目可以汇总</b>先在「今日」新建项目。</div>';
       } else {
-        var rows = [], tQty = 0, tDays = 0, tMin = 0, pQty = 0;
+        var rows = [], tQty = 0, tDays = 0, tMin = 0, pQty = 0, tDelay = 0;
         S.projects.forEach(function (p) {
-          var c = cur[p.id] || { nodes: 0, cnt: 0, min: 0 };
+          var c = cur[p.id] || { nodes: 0, cnt: 0, min: 0, delays: [] };
           var b = prev[p.id] || { nodes: 0 };
-          tQty += c.nodes; tDays += c.cnt; tMin += c.min; pQty += b.nodes;
+          var dl = c.delays || [];
+          tQty += c.nodes; tDays += c.cnt; tMin += c.min; pQty += b.nodes; tDelay += dl.length;
           rows.push(
             '<tr>' +
               '<td><div class="wk-name"><i style="background:' + escapeHtml(p.color || PALETTE[0]) + '"></i>' + escapeHtml(p.name) + '</div>' +
                 '<div class="tiny muted" style="margin-left:14px">' + escapeHtml(p.stage || '') + ' · 单位 ' + escapeHtml(p.unit) + '</div></td>' +
               '<td class="num">' + c.nodes + ' <small class="muted">个</small></td>' +
+              '<td class="num">' + (dl.length
+                ? '<span class="chip late" title="' + escapeHtml(dl.map(function (n) {
+                    return n.name + ' ' + (n.origPlanDate ? fmtMD(n.origPlanDate) + '→' : '') + fmtMD(n.planDate) +
+                      (n.delayReason ? '（' + n.delayReason + '）' : '');
+                  }).join('\n')) + '">' + dl.length + ' 项</span>'
+                : '<span class="muted">—</span>') + '</td>' +
               '<td class="num">' + c.cnt + ' <small class="muted">天</small></td>' +
               '<td class="num">' + fmtDays(c.min) + '</td>' +
               '<td>' + deltaHtml(c.nodes, b.nodes, '') + '</td>' +
@@ -58,6 +65,7 @@
           '<tr style="background:#fafbff">' +
             '<td style="font-weight:700">合计</td>' +
             '<td class="num">' + tQty + ' <small class="muted">个</small></td>' +
+            '<td class="num">' + (tDelay ? '<span class="chip late">' + tDelay + ' 项</span>' : '<span class="muted">—</span>') + '</td>' +
             '<td class="num">' + tDays + ' <small class="muted">天次</small></td>' +
             '<td class="num">' + fmtDays(tMin) + '</td>' +
             '<td>' + deltaHtml(tQty, pQty, '') + '</td>' +
@@ -65,7 +73,7 @@
 
         box.innerHTML =
           '<div style="overflow-x:auto"><table class="wk-table">' +
-          '<thead><tr><th>项目</th><th>完成节点</th><th>报工天数</th><th>投入工时（天）</th><th>环比上周</th></tr></thead>' +
+          '<thead><tr><th>项目</th><th>完成节点</th><th>本周延期</th><th>报工天数</th><th>投入工时（天）</th><th>环比上周</th></tr></thead>' +
           '<tbody>' + rows.join('') + '</tbody></table></div>';
       }
     }
@@ -94,7 +102,7 @@
 
   function saveKpt() {
     var db = sdk();
-    if (!db) { toast('当前未连接云端，复盘无法保存', 'err', function () { saveKpt(); }); return; }
+    if (!db) { toast(dst('当前未连接云端，复盘无法保存', '当前没有可用的数据存储，复盘无法保存'), 'err', function () { saveKpt(); }); return; }
     var key = currentWeekKey();
     var props = {
       '周标识': { text: key },
@@ -114,16 +122,17 @@
       : db.addRecord({ databaseId: 'nG1nopjeQW93K0wclTs4jR', properties: props });
 
     job.then(function () {
-      toast('本周复盘已保存到云端', 'ok');
+      toast(dst('本周复盘已保存到云端', '本周复盘已保存到本机数据库'), 'ok');
       S.kptDirty = false;
       return reloadData();
     }).catch(function (err) {
-      setSync('off', '复盘保存失败：内容没有写入云端。');
-      toast('保存失败，内容未写入云端', 'err', function () { saveKpt(); });
+      setSync('off', dst('复盘保存失败：内容没有写入云端。', '复盘保存失败：内容没有写入本机数据库。'));
+      toast(dst('保存失败，内容未写入云端', '保存失败，内容未写入本机数据库'), 'err', function () { saveKpt(); });
       if (window.console) console.error('[kpt] save failed', err);
     }).then(function () {
       btn.disabled = false;
-      btn.innerHTML = icon('save', 'ico-sm') + '保存到云端';
+      /* 和 02_body.html 的按钮初始文案保持一致，否则保存完会闪回旧版「保存到云端」 */
+      btn.innerHTML = icon('save', 'ico-sm') + dst('保存到云端', '保存复盘');
     });
   }
 

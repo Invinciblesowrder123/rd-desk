@@ -7,7 +7,7 @@
       var dsc = $('#meStoreDesc');
       if (dsc) {
         dsc.textContent = window.__REMOTE_STORE__
-          ? '项目数据保存在本机服务端数据库（bridge/desk.db），浏览器清缓存不影响；换机器或备份请用下方导出。'
+          ? '数据保存在本机服务端数据库（bridge/desk.db）。浏览器清缓存不影响；备份请停服务后复制数据库文件，页面不提供一键恢复。'
           : '项目数据保存在这台电脑的浏览器里（localStorage），清浏览器数据会一并丢失，建议定期导出备份';
       }
     }
@@ -20,31 +20,54 @@
   /* ============================================================
      备份：导出 / 恢复
      ============================================================ */
-  function exportJson() {
-    var payload = {
-      app: 'rd-desk',
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      projects: S.projects,
-      nodes: S.nodes,
-      logs: S.logs,
-      reviews: S.reviews
-    };
-    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  /* 下载 JSON：L2 走服务端整行导出，legacy 走内存快照，共用这一段 */
+  function downloadJson(obj, filename) {
+    var blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = '研发推进中台-备份-' + TODAY + '.json';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     setTimeout(function () {
       URL.revokeObjectURL(url);
       if (a.parentNode) a.parentNode.removeChild(a);
     }, 1200);
+  }
+
+  function exportJson() {
+    if (window.__REMOTE_STORE__) {
+      /* /api/export 返回 records.data 整行 JSON，含项目编码、客户、负责人、
+         延期理由等全字段；比内存里 normalize 之后的对象完整得多。
+         服务端没设 Content-Disposition，必须 fetch 后自己组装 Blob 才会下载。 */
+      fetch('/api/export').then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function (d) {
+        /* 打上格式标记：这是原始整行留档，legacy 的 readBackupFile 会据此拒绝，
+           避免有人拿它当旧版备份导入、清空 localStorage 后写入空记录。 */
+        var payload = Object.assign({}, d, { _format: 'rd-desk-l2-raw', _readonly: true });
+        downloadJson(payload, '研发推进中台-全量备份-' + TODAY + '.json');
+        toast('已导出全量备份（原始记录，仅留档，不能用于页面导入）', 'ok');
+      })['catch'](function (err) {
+        toast('导出失败：' + (err && err.message ? err.message : '未知错误'), 'err');
+        if (window.console) console.error('[export] failed', err);
+      });
+      return;
+    }
+    var payload = {
+      app: 'rd-desk', version: 1, exportedAt: new Date().toISOString(),
+      projects: S.projects, nodes: S.nodes, logs: S.logs, reviews: S.reviews
+    };
+    downloadJson(payload, '研发推进中台-备份-' + TODAY + '.json');
     toast('已导出备份文件', 'ok');
   }
 
   function readBackupFile(file) {
+    if (window.__REMOTE_STORE__) {
+      toast('本机数据库模式不支持此操作：请直接备份或替换 bridge/desk.db 文件', 'err');
+      return;
+    }
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
@@ -52,6 +75,10 @@
       try { data = JSON.parse(String(reader.result)); } catch (e) { data = null; }
       if (!data || (!data.projects && !data.logs)) {
         toast('这个文件不是有效的备份', 'err');
+        return;
+      }
+      if (data._readonly || data._format === 'rd-desk-l2-raw') {
+        toast('这是本机数据库的原始留档，不能用于页面导入', 'err');
         return;
       }
       var ps = data.projects || [], ls = data.logs || [], rs = data.reviews || [], ns = data.nodes || [];
@@ -66,6 +93,11 @@
   }
 
   function doImport(ps, ns, ls, rs) {
+    if (window.__REMOTE_STORE__) {
+      closeMask('maskConfirm');
+      toast('本机数据库模式不支持此操作：请直接备份或替换 bridge/desk.db 文件', 'err');
+      return;
+    }
     closeMask('maskConfirm');
     var db = sdk();
     if (!db) { toast('当前没有可用的数据存储', 'err'); return; }
@@ -184,6 +216,7 @@
     renderSide();
     renderBoard();
     renderWeek();
+    renderMonth();
     renderMe();
   }
 
@@ -213,7 +246,7 @@
   function reloadData() {
     if (!hasSdk()) {
       S.loaded = true;
-      setSync('off', '离线模式：未连接到资料库，数据不会保存。');
+      setSync('off', dst('离线模式：未连接到资料库，数据不会保存。', '离线模式：没能连上本机数据库，数据不会保存。'));
       refreshAll();
       return Promise.resolve();
     }
@@ -302,6 +335,10 @@
   }
 
   function clearDemo() {
+    if (window.__REMOTE_STORE__) {
+      toast('本机数据库模式不支持此操作：请直接备份或替换 bridge/desk.db 文件', 'err');
+      return;
+    }
     var demoLogs = S.logs.filter(function (l) { return DEMO_IDS.indexOf(l.pid) !== -1; });
     askConfirm('清空示例数据？',
       '将删除预置的 ' + DEMO_IDS.length + ' 个示例项目及其 ' + demoLogs.length + ' 条报工记录。<br><br>你自己新建的项目和周复盘不受影响。',
@@ -327,6 +364,10 @@
   }
 
   function clearAll() {
+    if (window.__REMOTE_STORE__) {
+      toast('本机数据库模式不支持此操作：请直接备份或替换 bridge/desk.db 文件', 'err');
+      return;
+    }
     var v = ($('#clearInput') ? $('#clearInput').value : '').trim();
     if (v !== '清空') {
       toast('请输入「清空」两个字再确认', 'err');
@@ -362,7 +403,7 @@
      ============================================================ */
   function switchTab(name) {
     S.tab = name;
-    ['today', 'board', 'week', 'me'].forEach(function (t) {
+    ['today', 'board', 'week', 'month', 'me'].forEach(function (t) {
       var panel = document.getElementById('panel-' + t);
       if (panel) panel.classList.toggle('hide', t !== name);
     });
@@ -372,6 +413,7 @@
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
     if (name === 'board' && S.loaded) renderBoard();
     if (name === 'week' && S.loaded) renderWeek();
+    if (name === 'month' && S.loaded) renderMonth();
   }
 
   /* ============================================================
@@ -407,6 +449,12 @@
       else if (act === 'done-node') completeNode(el.getAttribute('data-nid'));
       else if (act === 'undo-node') undoNode(el.getAttribute('data-nid'));
       else if (act === 'del-node') deleteNode(el.getAttribute('data-nid'));
+      else if (act === 'edit-done') startEditDone(el.getAttribute('data-nid'));
+      else if (act === 'save-done') saveDoneDate(el.getAttribute('data-nid'));
+      else if (act === 'cancel-done') cancelEditDone();
+      else if (act === 'edit-plan') startEditPlan(el.getAttribute('data-nid'));
+      else if (act === 'save-plan') savePlanDate(el.getAttribute('data-nid'));
+      else if (act === 'cancel-plan') cancelEditPlan();
       else if (act === 'clear-filter') resetProjFilter();
     });
 
@@ -556,21 +604,26 @@
     $$('[data-kpt]').forEach(function (t) { t.addEventListener('input', markKptDirty); });
 
     /* 我的 */
-    $('#btnResync').addEventListener('click', function () {
-      toast('正在重新同步…');
+    var resync = $('#btnResync');
+    if (resync) resync.addEventListener('click', function () {
+      toast('正在重新读取…');
       reloadData().then(function () {
-        if (S.syncState === 'ok') toast(dst('已与云端同步', '已保存到本机数据库'), 'ok');
+        if (S.syncState === 'ok') toast(dst('已与云端同步', '已重新读取本机数据'), 'ok');
       });
     });
-    $('#btnExport').addEventListener('click', exportJson);
-    $('#btnImport').addEventListener('click', function () { $('#importFile').click(); });
-    $('#importFile').addEventListener('change', function () {
+    /* 下面几个入口在 L2 下会被 applyLocalModeUi() 隐藏，但绑定仍要判空：
+       删 DOM 会让 boot 在这里抛 TypeError，整页白屏。 */
+    var exp = $('#btnExport'); if (exp) exp.addEventListener('click', exportJson);
+    var imp = $('#btnImport');
+    if (imp) imp.addEventListener('click', function () { var f = $('#importFile'); if (f) f.click(); });
+    var impFile = $('#importFile');
+    if (impFile) impFile.addEventListener('change', function () {
       var f = this.files && this.files[0];
       readBackupFile(f);
       this.value = '';
     });
-    $('#btnClearDemo').addEventListener('click', clearDemo);
-    $('#btnClearAll').addEventListener('click', clearAll);
+    var clrDemo = $('#btnClearDemo'); if (clrDemo) clrDemo.addEventListener('click', clearDemo);
+    var clrAll = $('#btnClearAll'); if (clrAll) clrAll.addEventListener('click', clearAll);
 
     /* 日期回填上限 */
     var repDate = $('#repDate');
@@ -591,17 +644,42 @@
   /* ============================================================
      启动：先渲染界面，再拉数据
      ============================================================ */
+  /* ============================================================
+     L2 专属 UI：收起云端时代遗留、且在 SQLite 真源下会伤数据的入口。
+     只隐藏、不删 DOM —— bindEvents 里仍有引用，删节点会整页白屏。
+     legacy（localStorage 应急版）不进这个分支，导出/恢复/PWA 引导都保留。
+     ============================================================ */
+  function applyLocalModeUi() {
+    if (!window.__REMOTE_STORE__) return;
+    var byId = function (id) { return document.getElementById(id); };
+    ['rowImport', 'dangerZone', 'pwaCard'].forEach(function (id) {
+      var el = byId(id);
+      if (el) el.classList.add('hide');
+    });
+    /* 双保险：即使有人手动把卡片显示出来，按钮也不可点 */
+    ['btnImport', 'btnClearDemo', 'btnClearAll', 'importFile'].forEach(function (id) {
+      var el = byId(id);
+      if (el) el.disabled = true;
+    });
+    var tip = byId('localDbTip');
+    if (tip) tip.classList.remove('hide');
+  }
+
   function boot() {
     TODAY = ymd(new Date());
+    applyLocalModeUi();
     bindEvents();
     bindNodeEvents();
+    bindMonthEvents();
     refreshAll();          /* 立刻出界面（骨架态），不空白等数据 */
     loadSchemaOnce();
     subscribeUpdates();
     reloadData();
-    /* 本地版的离线条默认文案也换掉（HTML 里写死了"云端"） */
+    /* 离线条按真实存储类型给文案：L2 是本机数据库，legacy 是浏览器本地存储 */
     var ot = $('#offlineTxt');
-    if (ot && LOCAL) ot.textContent = '离线模式：没能连上本机数据库，改动暂不会保存。';
+    if (ot && LOCAL) ot.textContent = window.__REMOTE_STORE__
+      ? '离线模式：没能连上本机数据库，改动暂不会保存。'
+      : '离线模式：没能连上本地存储，改动暂不会保存。';
   }
 
   if (document.readyState === 'loading') {

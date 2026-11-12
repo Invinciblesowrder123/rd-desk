@@ -238,6 +238,158 @@
     });
   }
 
+  /* ---------------- 改实际完成日 ----------------
+     完成日是「撤销」用来认领报工的依据（l.date === n.doneDate），
+     所以只改节点表的日期会让那条报工变成孤儿：撤销匹配不到 → 删不掉 →
+     工时和数量永久重复计。必须一次 batch 把两边一起改。 */
+  function saveDoneDate(nid) {
+    var n = findNode(nid);
+    if (!n) return;
+    var inp = $('#ndDoneDate');
+    var date = inp ? inp.value : '';
+    if (!date) { toast('请选择实际完成日', 'err'); return; }
+    if (date > TODAY) { toast('实际完成日不能晚于今天', 'err'); return; }
+    if (date === n.doneDate) { editingDoneNid = null; renderNodeList(); return; }
+
+    var db = sdk();
+    if (!db) { toast('当前没有可用的数据存储', 'err'); return; }
+
+    /* 找出这次「完成」写进去的那条报工 */
+    var related = [];
+    if (n.doneDate) {
+      related = S.logs.filter(function (l) {
+        return l.pid === n.pid && l.note === n.name && l.date === n.doneDate;
+      });
+    } else {
+      /* 老数据没存完成日：只有唯一一条候选时才敢认领，多条一律不动，避免误改别人的报工 */
+      var cand = S.logs.filter(function (l) {
+        return l.pid === n.pid && l.note === n.name;
+      });
+      if (cand.length === 1) related = cand;
+    }
+
+    var ops = [{
+      op: 'update',
+      databaseId: TBL_NODE,
+      recordId: nid,
+      properties: { '完成日': { date: date } }
+    }];
+    related.forEach(function (l) {
+      ops.push({
+        op: 'update',
+        databaseId: TBL_LOG,
+        recordId: l.id,
+        properties: { '日期': { date: date }, '补记': { checkbox: date < TODAY } }
+      });
+    });
+
+    setSync('busy');
+    var job;
+    if (typeof db.batch === 'function') {
+      job = db.batch(ops);
+    } else {
+      job = ops.reduce(function (p, op) {
+        return p.then(function () {
+          return db.updateRecord({ databaseId: op.databaseId, recordId: op.recordId, properties: op.properties });
+        });
+      }, Promise.resolve());
+    }
+
+    job.then(function () {
+      editingDoneNid = null;
+      toast('实际完成日已改为 ' + fmtMD(date) +
+        (related.length ? ' · 同步 ' + related.length + ' 条报工' : ''), 'ok');
+      return reloadData();
+    }).catch(function (err) {
+      setSync('off', '改期失败：数据没有完整写入，请重试。');
+      toast('改期失败，请重试', 'err', function () { saveDoneDate(nid); });
+      if (window.console) console.error('[node] edit done-date failed', err);
+    });
+  }
+
+  function cancelEditDone() {
+    editingDoneNid = null;
+    renderNodeList();
+  }
+
+  function startEditDone(nid) {
+    editingPlanNid = null;      /* 两个编辑框互斥 */
+    editingDoneNid = nid;
+    renderNodeList();
+    var inp = $('#ndDoneDate');
+    if (!inp) return;
+    try { inp.focus(); } catch (e) {}
+    /* Chrome 支持直接弹日历，不支持的浏览器忽略即可 */
+    try { if (typeof inp.showPicker === 'function') inp.showPicker(); } catch (e) {}
+  }
+
+  /* ---------------- 改计划完成日 ----------------
+     计划日不参与报工匹配，改它只影响甘特、按期判定和「已过计划日」标记，
+     所以一次单表 update 就够，不用 batch。 */
+  function startEditPlan(nid) {
+    editingDoneNid = null;      /* 两个编辑框互斥 */
+    editingPlanNid = nid;
+    renderNodeList();
+    var inp = $('#ndPlanDate');
+    if (!inp) return;
+    try { inp.focus(); } catch (e) {}
+    try { if (typeof inp.showPicker === 'function') inp.showPicker(); } catch (e) {}
+  }
+
+  function cancelEditPlan() {
+    editingPlanNid = null;
+    renderNodeList();
+  }
+
+  function savePlanDate(nid) {
+    var n = findNode(nid);
+    if (!n) return;
+    var inp = $('#ndPlanDate');
+    var date = inp ? inp.value : '';
+    if (!date) { toast('请选择计划完成日', 'err'); return; }
+    if (date === n.planDate) { editingPlanNid = null; renderNodeList(); return; }
+
+    var db = sdk();
+    if (!db) { toast('当前没有可用的数据存储', 'err'); return; }
+
+    /* 往后推就是延期：记原计划日 + 登记日 + 理由（理由可不填）。
+       提前或没排过期的，只改日期，不写延期字段。 */
+    var later = !!(n.planDate && date > n.planDate);
+    var reason = '';
+    if (later) {
+      var ri = $('#ndDelayReason');
+      reason = ri ? String(ri.value || '').trim() : '';
+    }
+
+    var props = { '计划完成日': { date: date } };
+    if (later) {
+      props['原计划日'] = { date: n.planDate };
+      props['延期日'] = { date: TODAY };
+      props['延期理由'] = { text: reason };
+      props['延期次数'] = { number: (n.delayCount || 0) + 1 };
+    }
+
+    setSync('busy');
+    db.updateRecord({
+      databaseId: TBL_NODE,
+      recordId: nid,
+      properties: props
+    }).then(function () {
+      editingPlanNid = null;
+      var msg = '计划完成日改为 ' + fmtMD(date);
+      if (later) {
+        var short = reason.length > 14 ? reason.slice(0, 14) + '…' : reason;
+        msg += ' · 已记一次延期' + (short ? '（' + short + '）' : '');
+      }
+      toast(msg, 'ok');
+      return reloadData();
+    }).catch(function (err) {
+      setSync('off', '改期失败：数据没有完整写入，请重试。');
+      toast('改计划日失败，请重试', 'err', function () { savePlanDate(nid); });
+      if (window.console) console.error('[node] edit plan-date failed', err);
+    });
+  }
+
   /* 撤销完成：连同那条报工一起撤回，避免重复计数 */
   function undoNode(nid) {
     var n = findNode(nid);
@@ -266,7 +418,8 @@
           op: 'update',
           databaseId: TBL_NODE,
           recordId: nid,
-          properties: { '已完成': { checkbox: false } }
+          /* 完成日一并清掉：留着旧日期，下次误按「完成」前它还会污染甘特与按期统计 */
+          properties: { '已完成': { checkbox: false }, '完成日': { date: '' } }
         });
         var job = (typeof db.batch === 'function')
           ? db.batch(ops)
@@ -309,9 +462,16 @@
 
   /* ---------------- 节点弹窗 ---------------- */
   var nodePid = null;
+  /* 正在改实际完成日的节点（null = 无）。日期是「撤销」匹配报工的依据，
+     所以不能在行里随手一改就算完，见 saveDoneDate() */
+  var editingDoneNid = null;
+  /* 正在改计划完成日的节点。和完成日互斥：同时只开一个编辑框 */
+  var editingPlanNid = null;
 
   function openNodeModal(pid) {
     nodePid = pid;
+    editingDoneNid = null;
+    editingPlanNid = null;
     var p = findProject(pid);
     if (!p) return;
     $('#nodeTitle').textContent = '节点 · ' + p.name;
@@ -340,21 +500,70 @@
       return;
     }
 
+    if (editingDoneNid && !st.list.some(function (x) { return x.id === editingDoneNid && x.done; })) {
+      editingDoneNid = null;
+    }
+    if (editingPlanNid && !st.list.some(function (x) { return x.id === editingPlanNid; })) {
+      editingPlanNid = null;
+    }
+
     var rows = st.list.map(function (n, idx) {
       var meta = [];
-      if (n.owner) meta.push(n.owner);
+      if (n.owner) meta.push(escapeHtml(n.owner));
       if (n.hours > 0) meta.push('预计 ' + fmtDays(n.hours * MIN_PER_DAY));
-      if (n.planDate) meta.push('计划 ' + fmtMD(n.planDate));
-      if (n.done && n.doneDate) meta.push('完成于 ' + fmtMD(n.doneDate));
+
+      /* 计划完成日：和完成日一样，点一下就能改。
+         没排期的节点给一个虚线「排计划日」，别做成大按钮抢焦点。 */
+      var planHtml = '';
+      if (editingPlanNid === n.id) {
+        planHtml = '<span class="nd-done-edit">' +
+          '<input type="date" class="nd-date" id="ndPlanDate" value="' +
+            escapeHtml(n.planDate || TODAY) + '" aria-label="计划完成日">' +
+          '<button class="btn btn-sm btn-primary" data-act="save-plan" data-nid="' +
+            escapeHtml(n.id) + '">保存</button>' +
+          '<button class="btn btn-sm" data-act="cancel-plan">取消</button>' +
+        '</span>' +
+        /* 日期一旦往后推就露出来：延期理由可选填，不填也能存 */
+        '<span class="nd-delay" id="ndDelayBox" hidden>' +
+          '<input type="text" class="nd-delay-in" id="ndDelayReason" maxlength="60"' +
+            ' placeholder="延期理由（可不填），如：供应商模具排期未确认">' +
+        '</span>';
+      } else {
+        planHtml = '<button type="button" class="nd-plan-date' + (n.planDate ? '' : ' none') +
+          '" data-act="edit-plan" data-nid="' + escapeHtml(n.id) + '" title="点击修改计划完成日">' +
+          (n.planDate ? '计划 ' + fmtMD(n.planDate) : '排计划日') + '</button>';
+      }
+
+      /* 完成日：默认是一个胶囊按钮，点开变日期选择器。
+         这条日期同时决定撤销时要删哪条报工，改动需连报工一起改。 */
+      var doneHtml = '';
+      if (n.done) {
+        if (editingDoneNid === n.id) {
+          doneHtml = '<span class="nd-done-edit">' +
+            '<input type="date" class="nd-date" id="ndDoneDate" value="' +
+              escapeHtml(n.doneDate || TODAY) + '" max="' + TODAY + '" aria-label="实际完成日">' +
+            '<button class="btn btn-sm btn-primary" data-act="save-done" data-nid="' +
+              escapeHtml(n.id) + '">保存</button>' +
+            '<button class="btn btn-sm" data-act="cancel-done">取消</button>' +
+          '</span>';
+        } else {
+          doneHtml = '<button type="button" class="nd-done-date" data-act="edit-done" data-nid="' +
+            escapeHtml(n.id) + '" title="点击修改实际完成日">' +
+            (n.doneDate ? '完成于 ' + fmtMD(n.doneDate) : '补填完成日') + '</button>';
+        }
+      }
 
       var late = !n.done && n.planDate && n.planDate < TODAY;
+      var metaHtml = meta.join(' · ');
+      if (planHtml) metaHtml += (metaHtml ? ' · ' : '') + planHtml;
+      if (doneHtml) metaHtml += (metaHtml ? ' · ' : '') + doneHtml;
 
       return '<div class="node-row ' + (n.done ? 'is-done' : '') + '">' +
         '<span class="nd-seq">' + (n.done ? '✓' : (idx + 1)) + '</span>' +
         '<div class="nd-main">' +
           '<div class="nd-name">' + escapeHtml(n.name) +
             (late ? '<span class="chip late">已过计划日</span>' : '') + '</div>' +
-          '<div class="nd-meta">' + escapeHtml(meta.join(' · ')) + '</div>' +
+          '<div class="nd-meta">' + metaHtml + '</div>' +
         '</div>' +
         (n.done
           ? '<button class="btn btn-sm" data-act="undo-node" data-nid="' + escapeHtml(n.id) + '">撤销</button>'
@@ -422,5 +631,43 @@
     $('#ndAdd').addEventListener('click', addNode);
     $('#maskNode').addEventListener('click', function (e) {
       if (e.target === this) this.classList.remove('on');
+    });
+
+    /* 改日期的输入框是动态渲染的，用委托接 Enter 保存 / Esc 取消 */
+    document.addEventListener('keydown', function (e) {
+      var t = e.target;
+      if (!t || !t.id) return;
+      if (t.id === 'ndDoneDate') {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (editingDoneNid) saveDoneDate(editingDoneNid);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelEditDone();
+        }
+      } else if (t.id === 'ndPlanDate') {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (editingPlanNid) savePlanDate(editingPlanNid);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelEditPlan();
+        }
+      }
+    });
+
+    /* 计划日往后推 → 露出延期理由输入框（不填也能保存） */
+    document.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t || t.id !== 'ndPlanDate') return;
+      var n = editingPlanNid ? findNode(editingPlanNid) : null;
+      var box = $('#ndDelayBox');
+      if (!box || !n) return;
+      var later = !!(n.planDate && t.value && t.value > n.planDate);
+      box.hidden = !later;
+      if (later) {
+        var ri = $('#ndDelayReason');
+        if (ri) { try { ri.focus(); } catch (e2) {} }
+      }
     });
   }

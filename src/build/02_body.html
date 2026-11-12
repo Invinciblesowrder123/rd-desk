@@ -27,6 +27,8 @@
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15.5v-11M7.5 8.5 12 4l4.5 4.5M4.5 19.5h15"/></symbol>
   <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4.5h11l3.5 3.5v11.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1z"/><path d="M8 4.5v5h7v-5M8 20.5V14h8v6.5"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M8 3v3M16 3v3M3 9.5h18M7.4 13.2h3.2M13.4 13.2h3.2M7.4 17h3.2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9.5 12 15.5 18 9.5"/></symbol>
 </svg>
 
 <div class="shell">
@@ -40,6 +42,7 @@
       <button data-tab="today" class="on"><svg class="ico"><use href="#i-today"/></svg>今日</button>
       <button data-tab="board"><svg class="ico"><use href="#i-board"/></svg>看板</button>
       <button data-tab="week"><svg class="ico"><use href="#i-report"/></svg>周报</button>
+      <button data-tab="month"><svg class="ico"><use href="#i-cal"/></svg>月报</button>
       <button data-tab="me"><svg class="ico"><use href="#i-me"/></svg>我的</button>
     </nav>
     <div class="side-foot">
@@ -57,13 +60,14 @@
         <button data-tab="today" class="on"><svg class="ico ico-sm"><use href="#i-today"/></svg>今日</button>
         <button data-tab="board"><svg class="ico ico-sm"><use href="#i-board"/></svg>看板</button>
         <button data-tab="week"><svg class="ico ico-sm"><use href="#i-report"/></svg>周报</button>
+        <button data-tab="month"><svg class="ico ico-sm"><use href="#i-cal"/></svg>月报</button>
         <button data-tab="me"><svg class="ico ico-sm"><use href="#i-me"/></svg>我的</button>
         <span class="t-sync"><span class="dot"></span><span id="syncTopTxt">已同步</span></span>
       </nav>
 
       <div class="offline-bar" id="offlineBar">
         <svg class="ico ico-sm"><use href="#i-alert"/></svg>
-        <span id="offlineTxt">离线模式：数据未能与云端连通，改动暂不会保存。</span>
+        <span id="offlineTxt">离线模式：没能连上数据存储，改动暂不会保存。</span>
       </div>
 
       <!-- ============ Tab 1 今日 ============ -->
@@ -157,7 +161,7 @@
             <div class="kpt"><label><i style="background:#8b5cf6"></i>下周预案</label><textarea id="kptNext" data-kpt="next" placeholder="如果……就……"></textarea></div>
           </div>
           <div style="display:flex;gap:9px;margin-top:12px;flex-wrap:wrap">
-            <button class="btn btn-primary" id="btnSaveKpt"><svg class="ico ico-sm"><use href="#i-save"/></svg>保存到云端</button>
+            <button class="btn btn-primary" id="btnSaveKpt"><svg class="ico ico-sm"><use href="#i-save"/></svg>保存复盘</button>
             <button class="btn" id="btnGenReport"><svg class="ico ico-sm"><use href="#i-report"/></svg>生成周报文本</button>
             <button class="btn" id="btnCopyReport"><svg class="ico ico-sm"><use href="#i-copy"/></svg>复制</button>
           </div>
@@ -168,7 +172,51 @@
         </div>
       </section>
 
-      <!-- ============ Tab 4 我的 ============ -->
+      <!-- ============ Tab 4 月报 ============ -->
+      <section class="tab-panel hide" id="panel-month">
+        <div class="page-head">
+          <div>
+            <h1>项目月报</h1>
+            <div class="sub"><svg class="ico ico-sm"><use href="#i-cal"/></svg><span>按月份挑出有实际进展的节点与项目，打印成 PDF 或导出可编辑 PPT</span></div>
+          </div>
+          <div class="head-actions">
+            <button class="btn" id="moPpt">
+              <svg class="ico ico-sm"><use href="#i-board"/></svg>导出 PPT
+            </button>
+            <button class="btn btn-primary" id="moPrint">
+              <svg class="ico ico-sm"><use href="#i-download"/></svg>打印 / 存 PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="mo-bar">
+          <div class="mo-f">
+            <label for="moMonth">月份</label>
+            <select id="moMonth"></select>
+          </div>
+          <div class="mo-f mo-f-multi" id="moProjWrap">
+            <label>项目</label>
+            <button type="button" class="mo-ms-btn" id="moProjBtn" aria-haspopup="true" aria-expanded="false">
+              <span id="moProjLabel">全部项目</span>
+              <svg class="ico ico-sm mo-ms-chev"><use href="#i-chev"/></svg>
+            </button>
+            <div class="mo-ms" id="moProjPanel">
+              <div class="mo-ms-top">
+                <label class="mo-ms-all"><input type="checkbox" id="moProjAll"><span>全选</span></label>
+                <button type="button" class="mo-ms-clear" id="moProjClear">全不选</button>
+              </div>
+              <div class="mo-ms-list" id="moProjList"></div>
+            </div>
+          </div>
+          <div class="mo-stat" id="moStat"></div>
+        </div>
+
+        <div class="mo-stage">
+          <div class="mo-paper" id="monthPaper"></div>
+        </div>
+      </section>
+
+      <!-- ============ Tab 5 我的 ============ -->
       <section class="tab-panel hide" id="panel-me">
         <div class="page-head">
           <div>
@@ -178,21 +226,28 @@
         </div>
 
         <div class="card">
-          <div class="card-h"><h2><svg class="ico ico-sm"><use href="#i-refresh"/></svg>在线同步</h2><span class="muted tiny">资料库数据表</span></div>
+          <div class="card-h"><h2><svg class="ico ico-sm"><use href="#i-refresh"/></svg>数据存储</h2><span class="muted tiny">本机</span></div>
           <div class="me-list">
             <div class="me-row">
               <div class="mrow-ico"><span class="dot" id="meDot"></span></div>
               <div class="mrow-body">
-                <div class="mrow-t" id="meSyncState">已同步</div>
-                <div class="mrow-d" id="meSyncTime">最近一次同步：—</div>
+                <div class="mrow-t" id="meSyncState">已连接</div>
+                <div class="mrow-d" id="meSyncTime">最近写入：—</div>
               </div>
-              <button class="btn btn-sm" id="btnResync"><svg class="ico ico-sm"><use href="#i-refresh"/></svg>重新同步</button>
+              <button class="btn btn-sm" id="btnResync"><svg class="ico ico-sm"><use href="#i-refresh"/></svg>重新读取</button>
             </div>
             <div class="me-row">
               <div class="mrow-ico"><svg class="ico ico-sm"><use href="#i-layers"/></svg></div>
               <div class="mrow-body">
                 <div class="mrow-t" id="meStoreTitle">数据存放位置</div>
-                <div class="mrow-d" id="meStoreDesc">研发项目 / 每日报工 / 每周复盘 三张资料库数据表，换设备打开即同步</div>
+                <div class="mrow-d" id="meStoreDesc">正在读取…</div>
+              </div>
+            </div>
+            <div class="me-row hide" id="localDbTip">
+              <div class="mrow-ico"><svg class="ico ico-sm"><use href="#i-shield"/></svg></div>
+              <div class="mrow-body">
+                <div class="mrow-t">数据文件与备份</div>
+                <div class="mrow-d">数据保存在 <b>bridge/desk.db</b>。备份请先停服务，再复制该文件和同目录的 -wal / -shm；恢复请用文件覆盖，页面不提供一键回灌。</div>
               </div>
             </div>
             <div class="me-row">
@@ -205,7 +260,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="pwaCard">
           <div class="card-h"><h2><svg class="ico ico-sm"><use href="#i-phone"/></svg>添加到手机主屏幕</h2></div>
           <div class="steps">
             <div class="step"><span class="s-n">1</span><span class="s-t">用手机浏览器（Safari / Chrome）打开本页链接。</span></div>
@@ -215,17 +270,17 @@
         </div>
 
         <div class="card">
-          <div class="card-h"><h2><svg class="ico ico-sm"><use href="#i-download"/></svg>数据备份</h2><span class="muted tiny">换浏览器 / 换设备时用它搬家</span></div>
+          <div class="card-h"><h2><svg class="ico ico-sm"><use href="#i-download"/></svg>导出与备份</h2><span class="muted tiny">导出当前数据留档</span></div>
           <div class="me-list">
             <div class="me-row">
               <div class="mrow-ico"><svg class="ico ico-sm"><use href="#i-download"/></svg></div>
               <div class="mrow-body">
-                <div class="mrow-t">导出 JSON 备份</div>
-                <div class="mrow-d">项目、报工记录、周复盘全部导成一个文件</div>
+                <div class="mrow-t">导出数据备份</div>
+                <div class="mrow-d">把当前数据导成一个 JSON 文件留档；恢复请用数据库文件</div>
               </div>
               <button class="btn btn-sm" id="btnExport">导出</button>
             </div>
-            <div class="me-row">
+            <div class="me-row" id="rowImport">
               <div class="mrow-ico"><svg class="ico ico-sm"><use href="#i-upload"/></svg></div>
               <div class="mrow-body">
                 <div class="mrow-t">从备份恢复</div>
@@ -237,7 +292,7 @@
           </div>
         </div>
 
-        <div class="card danger-zone">
+        <div class="card danger-zone" id="dangerZone">
           <div class="card-h"><h2 style="color:#b3123c"><svg class="ico ico-sm"><use href="#i-alert"/></svg>数据清理</h2></div>
           <div class="me-list">
             <div class="me-row">
@@ -273,6 +328,7 @@
   <button data-tab="today" class="on"><svg class="ico ico-lg"><use href="#i-today"/></svg>今日</button>
   <button data-tab="board"><svg class="ico ico-lg"><use href="#i-board"/></svg>看板</button>
   <button data-tab="week"><svg class="ico ico-lg"><use href="#i-report"/></svg>周报</button>
+  <button data-tab="month"><svg class="ico ico-lg"><use href="#i-cal"/></svg>月报</button>
   <button data-tab="me"><svg class="ico ico-lg"><use href="#i-me"/></svg>我的</button>
 </nav>
 
@@ -361,7 +417,7 @@
 <div class="mask" id="maskNode">
   <div class="modal" style="max-width:560px" role="dialog" aria-modal="true">
     <h3 id="nodeTitle">节点</h3>
-    <div class="m-sub">把项目拆成能一键关闭的节点。点「完成」就记一次报工，数量、工时、日期自动带出。</div>
+    <div class="m-sub">把项目拆成能一键关闭的节点。点「完成」就记一次报工，数量、工时、日期自动带出；点节点上的日期胶囊可以改计划完成日，已完成的还能改实际完成日。</div>
     <div id="nodeList"></div>
     <div class="node-add">
 

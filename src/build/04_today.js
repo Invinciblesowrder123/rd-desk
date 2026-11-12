@@ -191,10 +191,10 @@
           '</div>');
       } else if (it.kind === 'broken') {
         html.push(
-          '<div class="attn red">' +
+          '<div class="attn amber">' +
             '<div class="a-ico">' + icon('clock') + '</div>' +
             '<div class="a-body">' +
-              '<div class="a-title">' + escapeHtml(p.name) + '<span class="chip late">连续缺报</span></div>' +
+              '<div class="a-title">' + escapeHtml(p.name) + '<span class="chip buf">连续缺报</span></div>' +
               '<div class="a-desc">昨日（' + escapeHtml(fmtMD(addDays(TODAY, -1))) + '）未报工，本周缓冲日已用完，连续记录断在此处。还有 ' + m.dueNodes + ' 个节点计划已到还没关，今天推进一下再补记。</div>' +
             '</div>' +
             '<div class="a-actions">' +
@@ -204,7 +204,7 @@
           '</div>');
       } else {
         html.push(
-          '<div class="attn amber">' +
+          '<div class="attn blue">' +
             '<div class="a-ico">' + icon('shield') + '</div>' +
             '<div class="a-body">' +
               '<div class="a-title">' + escapeHtml(p.name) + '<span class="chip buf">缓冲日</span></div>' +

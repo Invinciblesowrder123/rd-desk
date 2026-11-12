@@ -31,7 +31,7 @@ EV 手板、可靠性复测、3C 认证、试产、量产评审。看板回答�
 
 ## 界面
 
-四个视图，都是同一份数据的四种切法。
+五个视图，都是同一份数据的五种切法：今日、看板、周报、月报、我的。
 
 ### 看板：项目全景 + 投入工时
 
@@ -46,6 +46,14 @@ EV 手板、可靠性复测、3C 认证、试产、量产评审。看板回答�
 
 按项目统计完成节点、报工天数、投入工时、环比；下面四栏是周会纪要点（保持/问题/尝试/下周预案），
 能一键生成可直接贴进群里的周报文本。
+
+### 月报：按月份归档进展
+
+选中月份，挑出这个月里真正有进展的节点与项目，生成一份可打印的月度回顾；
+可以直接打印成 PDF，也能导出成可编辑的 PPT（用到的 `pptxgen` 已打包在
+`local/vendor/`，导出不联网）。
+
+> 截图暂未收录月报视图，跑起来切到「月报」即可看到。
 
 ### 我的：备份与数据管理
 
@@ -63,7 +71,7 @@ EV 手板、可靠性复测、3C 认证、试产、量产评审。看板回答�
 需要 Python 3.9+，无第三方依赖。
 
 ```bash
-git clone <this-repo> rd-desk
+git clone https://github.com/Invinciblesowrder123/rd-desk.git
 cd rd-desk
 
 # 1) 生成演示数据（日期按今天算，所以打开就像在用的系统）
@@ -119,7 +127,8 @@ python local/server.py 8787
   `index.html` 的构建戳，页面发现前端换过版本会提示刷新——不刷就一直跑旧 JS。
 - **记录整行存 JSON**：加字段不用改表结构；需要写 SQL 的地方用 `v_projects` / `v_nodes`
   等视图（见数据模型文档）。
-- **前端零框架**：一段原生 JS，构建脚本把 6 个源文件拼成一个 HTML，没有 npm、没有打包器。
+- **前端零框架**：构建脚本把 `01_head.html` / `02_body.html` 骨架和 7 个 JS 片段拼成一个 HTML，
+  再按版本接上 `08_remotedb.js`（走 /api）或 `08_localdb.js`（localStorage），没有 npm、没有打包器。
 
 ---
 
@@ -127,7 +136,7 @@ python local/server.py 8787
 
 ```
 local/            运行时代码：server.py（HTTP+API）、deskdb.py（存储）、index.html（构建产物）
-src/              页面源码：build/ 下 10 个片段 + build.py 拼接
+src/              页面源码：build/ 下 11 个片段 + build.py 拼接
 src/out/          构建中间产物（不入库）
 data/             种子数据（seed.demo.json 演示用；seed.json 真实数据，不入库）
 bridge/           运行时数据库（不入库）

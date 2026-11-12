@@ -110,6 +110,9 @@ SCHEMAS = {
         {"name": "序号", "type": "number"}, {"name": "计划完成日", "type": "date"},
         {"name": "已完成", "type": "checkbox"}, {"name": "完成日", "type": "date"},
         {"name": "备注", "type": "text"}, {"name": "负责人", "type": "text"},
+        # 延期登记：把计划日往后推时自动记一笔，周报/月报据此体现
+        {"name": "原计划日", "type": "date"}, {"name": "延期日", "type": "date"},
+        {"name": "延期理由", "type": "text"}, {"name": "延期次数", "type": "number"},
         {"name": "节点状态", "type": "select", "config": {"options": [
             {"text": "待开始"}, {"text": "进行中"}, {"text": "已完成"}, {"text": "阻塞"}]}},
     ]},

@@ -8,7 +8,7 @@ LOCAL_DIR = os.path.join(ROOT, 'local')
 DATA_DIR = os.path.join(ROOT, 'data')
 SEED_DEMO = os.path.join(DATA_DIR, 'seed.demo.json')
 
-PARTS = ['03_core.js', '04_today.js', '05_board.js', '06_week.js', '09_nodes.js', '07_me.js']
+PARTS = ['03_core.js', '04_today.js', '05_board.js', '06_week.js', '09_nodes.js', '10_month.js', '07_me.js']
 
 
 def read(name):

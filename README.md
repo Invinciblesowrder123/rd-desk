@@ -53,7 +53,9 @@ EV 手板、可靠性复测、3C 认证、试产、量产评审。看板回答�
 可以直接打印成 PDF，也能导出成可编辑的 PPT（用到的 `pptxgen` 已打包在
 `local/vendor/`，导出不联网）。
 
-> 截图暂未收录月报视图，跑起来切到「月报」即可看到。
+![项目月报](docs/images/month.png)
+
+> 截图选的是 2026 年 10 月——演示数据里有进展的月份；月报默认打开当前月，没有进展时会是空表。
 
 ### 我的：备份与数据管理
 
@@ -211,3 +213,13 @@ python src/build.py
 
 仓库里的演示数据全部虚构；截图拍摄时用的就是这份演示数据，没有真实客户、项目或人名。
 真实数据的种子文件（`data/seed.json`）和运行时数据库（`bridge/*.db`）都在 `.gitignore` 里，不会入库。
+
+---
+
+## 许可
+
+本项目原创代码采用 [MIT](LICENSE) 许可。
+
+`local/vendor/pptxgen.bundle.js` 是 [PptxGenJS 3.12.0](https://github.com/gitbrent/PptxGenJS)
+（内含 JSZip）的打包产物，来自上游项目，适用其自身的许可条款，
+不属于上述 MIT 声明覆盖的原创代码。
